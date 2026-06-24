@@ -1,0 +1,13 @@
+Found 3 connected devices:
+  SM A736B (mobile) • R5CT812X39D • android-arm64  • Android 16 (API 36)
+  macOS (desktop)   • macos       • darwin-arm64   • macOS 26.5.1 25F80 darwin-arm64
+  Chrome (web)      • chrome      • web-javascript • Google Chrome 149.0.7827.115
+
+Checking for wireless devices...
+
+Found 1 wirelessly connected device:
+  JLVN-MobileP005-iPhone 11 (wireless) (mobile) • 00008030-000E74861468C02E • ios • iOS 17.4.1 21E236
+
+Run "flutter emulators" to list and start any available device emulators.
+
+If you expected another device to be detected, please run "flutter doctor" to diagnose potential issues. You may also try increasing the time to wait for connected devices with the "--device-timeout" flag. Visit https://flutter.dev/setup/ for troubleshooting tips.

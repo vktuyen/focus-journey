@@ -1,0 +1,90 @@
+# ---- Workspace convention ----
+# src/ hosts independent git repos cloned for actual work.
+# The parent workspace repo intentionally does not track any of it.
+# src/
+
+# ---- Node.js / JavaScript / TypeScript ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.yarn/cache/
+.yarn/install-state.gz
+
+# ---- .NET ----
+bin/
+obj/
+*.user
+*.suo
+.vs/
+packages/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage data — must land in per-run report folder, never at repo root.
+# Unanchored patterns catch the files wherever they land, even if a runner
+# forgets to redirect via COVERAGE_FILE / --cov-report into tests/_runner/.
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# ---- JVM (Maven / Gradle) ----
+target/
+build/
+.gradle/
+
+# ---- Go ----
+vendor/
+
+# ---- OS metadata ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Editor scratch ----
+*.swp
+*.swo
+*~
+
+# ---- Claude Code local settings ----
+.claude/settings.local.json
+
+# ---- Claude Code usage metrics (per-developer, local) ----
+# Written by scripts/track-usage.py via the Stop/SubagentStop/SessionEnd hooks.
+# Token counts are exact; cost is a list-price estimate. /gen-summary reads
+# .claude/metrics/usage-summary.json. Local-only — do not commit.
+.claude/metrics/
+
+# ---- Logs / temp ----
+*.log
+*.tmp
+
+# ---- Test runner: ephemeral artifacts ----
+# The chosen runner is declared in docs/architecture/overview.md and configured
+# under tests/_runner/. Run summaries committed under
+# tests/_runner/reports/<slug>/<timestamp>/ are kept (see
+# docs/guides/development-workflow.md Phase 5); raw artifacts (traces, videos,
+# screenshots, caches) are regenerable and excluded.
+tests/_runner/reports/**/raw/
+tests/_runner/reports/**/traces/
+tests/_runner/reports/**/videos/
+tests/_runner/reports/**/screenshots/
+tests/_runner/**/.cache/
+test-results/
+.last-run.json
+.env
+
+# FVM Version Cache
+.fvm/

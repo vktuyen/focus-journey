@@ -1,0 +1,15 @@
+[activity-harness] t=6s  idle=23s  locked=false
+[activity-harness] t=8s  idle=25s  locked=false
+[activity-harness] t=10s  idle=27s  locked=false
+[activity-harness] t=12s  idle=29s  locked=false
+[activity-harness] t=14s  idle=31s  locked=false
+[activity-harness] t=16s  idle=33s  locked=false
+[activity-harness] t=18s  idle=35s  locked=false
+[activity-harness] t=20s  idle=37s  locked=false
+[activity-harness] t=22s  idle=39s  locked=false
+[activity-harness] t=24s  idle=41s  locked=false
+[activity-harness] t=26s  idle=43s  locked=false
+[activity-harness] t=28s  idle=45s  locked=false
+[activity-harness] t=30s  idle=47s  locked=false
+[activity-harness] done.
+00:44 +1: logs idle + lock readings on a timer (manual harness)                                                                                                                                        00:44 +1: (tearDownAll)                                                                                                                                                                                00:44 +1: All tests passed!                                                                                                                                                                            
