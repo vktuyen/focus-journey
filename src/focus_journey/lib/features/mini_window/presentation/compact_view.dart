@@ -20,6 +20,7 @@ import '../../journey/presentation/journey_cubit.dart';
 import '../../journey/presentation/journey_overlays.dart';
 import '../../journey/presentation/journey_view_state.dart';
 import '../domain/window_mode_controller.dart';
+import 'app_shell_cubit.dart';
 
 /// The compact PiP layout scale applied to the journey overlays so the readout
 /// fits the small fixed window (CompactGeometry 280×180).
@@ -48,39 +49,103 @@ class CompactView extends StatelessWidget {
     final bool reduceMotion = MediaQuery.of(context).disableAnimations;
     return Material(
       color: Colors.black,
-      child: _CompactDragRegion(
-        controller: controller,
-        child: BlocBuilder<JourneyCubit, JourneyViewState>(
-          builder: (BuildContext context, JourneyViewState s) {
-            return Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                // The SAME shared Flame scene, sized down (AC-1/AC-9).
-                GameWidget<JourneyGame>(game: sharedGame),
+      // The expand/restore control is layered ABOVE the drag region in this
+      // Stack so it wins the hit test (the drag region uses
+      // HitTestBehavior.translucent and a pan recognizer — placed UNDER the
+      // button, its pan can no longer swallow a tap on the button's area). The
+      // rest of the body still drags the frameless window (AC-6).
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          _CompactDragRegion(
+            controller: controller,
+            child: BlocBuilder<JourneyCubit, JourneyViewState>(
+              builder: (BuildContext context, JourneyViewState s) {
+                return Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    // The SAME shared Flame scene, sized down (AC-1/AC-9).
+                    GameWidget<JourneyGame>(game: sharedGame),
 
-                // Reduce-motion: a non-scrolling textual indicator that still
-                // conveys active-vs-stopped (NFR-3), matching journey-view.
-                if (reduceMotion)
-                  ReduceMotionIndicator(
-                    moving: s.motion == JourneyMotion.moving,
-                    scale: _kCompactScale,
-                  ),
+                    // Reduce-motion: a non-scrolling textual indicator that
+                    // still conveys active-vs-stopped (NFR-3), matching
+                    // journey-view.
+                    if (reduceMotion)
+                      ReduceMotionIndicator(
+                        moving: s.motion == JourneyMotion.moving,
+                        scale: _kCompactScale,
+                      ),
 
-                // Tiny distance readout — real, selectable/semantic text, NOT
-                // baked into the sprite (NFR-6), equal to the Bloc's distanceKm
-                // (AC-4). Same value as the main window at the same instant.
-                DistanceCounter(
-                  distanceKm: s.distanceKm,
-                  scale: _kCompactScale,
-                ),
+                    // Tiny distance readout — real, selectable/semantic text,
+                    // NOT baked into the sprite (NFR-6), equal to the Bloc's
+                    // distanceKm (AC-4). Same value as the main window at the
+                    // same instant.
+                    DistanceCounter(
+                      distanceKm: s.distanceKm,
+                      scale: _kCompactScale,
+                    ),
 
-                // "Paused — idle" readout for a real stopped state (AC-2),
-                // matching journey-view; first frame stays parked w/o overlay.
-                if (s.showPausedOverlay)
-                  const PausedOverlay(scale: _kCompactScale),
-              ],
-            );
-          },
+                    // "Paused — idle" readout for a real stopped state (AC-2),
+                    // matching journey-view; first frame stays parked w/o
+                    // overlay.
+                    if (s.showPausedOverlay)
+                      const PausedOverlay(scale: _kCompactScale),
+                  ],
+                );
+              },
+            ),
+          ),
+
+          // The expand / restore control (YouTube-PiP style). Top-right corner,
+          // ABOVE the drag region so its tap is never swallowed by the
+          // window-move pan. Restores the full framed window via the
+          // AppShellCubit seam (→ controller.showApp() → exitFull() while
+          // compact) — no window_manager import leaks into presentation.
+          const _CompactExpandButton(),
+        ],
+      ),
+    );
+  }
+}
+
+/// The expand / restore control shown over the compact PiP (BUG 1 fix). A small
+/// icon button in the top-right corner that returns to the full framed window.
+///
+/// It talks ONLY to the [AppShellCubit] seam (`showApp()`), which routes to
+/// `controller.showApp()` → `exitFull()` while in compact mode — keeping
+/// `window_manager` out of presentation. It is layered ABOVE the
+/// [_CompactDragRegion] in the parent Stack so its tap wins the hit test and is
+/// never swallowed by the frameless window-move pan.
+class _CompactExpandButton extends StatelessWidget {
+  const _CompactExpandButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topRight,
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Material(
+          color: Colors.black.withValues(alpha: 0.55),
+          shape: const CircleBorder(),
+          child: IconButton(
+            iconSize: 18,
+            padding: const EdgeInsets.all(6),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Back to full window',
+            icon: const Icon(Icons.open_in_full, color: Colors.white),
+            onPressed: () {
+              // Guarded (S1): showApp may rethrow; log rather than leak an
+              // unhandled future. showApp() → exitFull() while compact.
+              context.read<AppShellCubit>().showApp().catchError((
+                Object error,
+                StackTrace stack,
+              ) {
+                debugPrint('CompactView: expand (showApp) failed: $error');
+              });
+            },
+          ),
         ),
       ),
     );
@@ -103,12 +168,23 @@ class _CompactDragRegion extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       // Start an OS window-move drag when the body is dragged. The OS owns the
-      // move from here; we only need to kick it off on pan start.
-      onPanStart: (_) => controller.startDragging(),
+      // move from here; we only need to kick it off on pan start. The controller
+      // may rethrow on failure (S1) — guard so it can never become an unhandled
+      // future, while letting the drag gesture itself proceed.
+      onPanStart: (_) => _guard('startDragging', controller.startDragging()),
       // Persist the new position once the user lets go (AC-8). The OS has
       // already finished moving the window by drag end.
-      onPanEnd: (_) => controller.persistCompactPosition(),
+      onPanEnd: (_) =>
+          _guard('persistCompactPosition', controller.persistCompactPosition()),
       child: child,
     );
+  }
+
+  /// Guards a fire-and-forget controller transition so a failure (the controller
+  /// now rethrows) is logged rather than surfacing as an unhandled future.
+  void _guard(String action, Future<void> future) {
+    future.catchError((Object error, StackTrace stack) {
+      debugPrint('CompactView: $action failed: $error');
+    });
   }
 }

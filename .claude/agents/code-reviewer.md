@@ -16,7 +16,7 @@ You are the code review specialist.
 - Surface issues — do not silently fix them. Fixes route back to `code-generator` / `unit-test-writer` / `test-script-author`.
 
 ## Where to read
-- `specs/<feature>/spec.md` and `specs/<feature>/acceptance-criteria.md` — the contract
+- `specs/<feature>/spec.md` — including its inline `## Acceptance criteria` section — the contract
 - `tests/cases/<feature>.md` — the scenarios that must be covered
 - `src/` — production code under review
 - `tests/unit/`, `tests/integration/`, `tests/e2e/` — test scripts under review

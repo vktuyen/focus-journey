@@ -37,6 +37,7 @@ class JourneyViewState extends Equatable {
     required this.mode,
     required this.distanceKm,
     required this.hasRealState,
+    this.idleTimeToday = Duration.zero,
   });
 
   /// The first-frame / pre-state default (AC-13): parked, default skin, zero
@@ -47,7 +48,8 @@ class JourneyViewState extends Equatable {
     : motion = JourneyMotion.stopped,
       mode = TravelMode.motorbike,
       distanceKm = 0,
-      hasRealState = false;
+      hasRealState = false,
+      idleTimeToday = Duration.zero;
 
   /// Maps a real engine snapshot to the view (TC-005/TC-021).
   ///
@@ -57,8 +59,9 @@ class JourneyViewState extends Equatable {
   factory JourneyViewState.fromEngine(
     JourneyState state,
     TravelMode mode,
-    double distanceKm,
-  ) {
+    double distanceKm, {
+    Duration idleTimeToday = Duration.zero,
+  }) {
     final JourneyMotion motion = state == JourneyState.active
         ? JourneyMotion.moving
         : JourneyMotion.stopped;
@@ -67,6 +70,7 @@ class JourneyViewState extends Equatable {
       mode: mode,
       distanceKm: distanceKm,
       hasRealState: true,
+      idleTimeToday: idleTimeToday,
     );
   }
 
@@ -78,6 +82,14 @@ class JourneyViewState extends Equatable {
 
   /// Cumulative distance for the plain-Flutter counter overlay (NOT the scene).
   final double distanceKm;
+
+  /// The displayed idle counter (idle-accounting AC-2). It is the engine's
+  /// `idleTimeToday` accumulator read verbatim — the Cubit applies NO
+  /// independent rounding or smoothing — so the displayed value and the
+  /// accounting accumulator agree with **divergence 0** by construction (Option
+  /// B anchors both to the same stamped value). Never derived from a separate
+  /// wall-clock-since-onset computation that could drift.
+  final Duration idleTimeToday;
 
   /// `true` once a real engine state has been observed; `false` only for the
   /// pre-state [JourneyViewState.initial] default. Gates the overlay so the
@@ -93,5 +105,11 @@ class JourneyViewState extends Equatable {
   bool get showPausedOverlay => motion == JourneyMotion.stopped && hasRealState;
 
   @override
-  List<Object?> get props => <Object?>[motion, mode, distanceKm, hasRealState];
+  List<Object?> get props => <Object?>[
+    motion,
+    mode,
+    distanceKm,
+    hasRealState,
+    idleTimeToday,
+  ];
 }

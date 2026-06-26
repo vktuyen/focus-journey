@@ -15,7 +15,11 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../stats/domain/app_settings.dart';
+import '../../stats/presentation/settings_cubit.dart';
+import '../../stats/presentation/vehicle_picker.dart';
 import '../domain/clock.dart';
+import '../domain/travel_mode.dart';
 import 'game/journey_game.dart';
 import 'journey_cubit.dart';
 import 'journey_overlays.dart';
@@ -133,10 +137,19 @@ class _JourneyScreenState extends State<JourneyScreen>
     return now.hour + now.minute / 60.0 + now.second / 3600.0;
   }
 
+  /// Drives the scene from the current journey state, applying the COSMETIC
+  /// vehicle-preference override at this presentation seam (ADR-0007 / AC-3/AC-4):
+  /// the displayed mode is `vehiclePreference ?? engineMode`, resolved here —
+  /// at/above `JourneyViewState`, NOT in the engine and NOT in `JourneyCubit`
+  /// (which stays a pure engine reader). The scene still takes ONE `mode:` value
+  /// via `applyState`, so the cockpit-vs-side-view branch + sprite resolve off
+  /// the one overridden value (AC-1/AC-2), with no per-frame cost (NFR-1).
   void _applyToScene(BuildContext context, JourneyViewState s) {
     _game.applyState(
       moving: s.motion == JourneyMotion.moving,
-      mode: s.mode,
+      // Shared override seam (ADR-0007): vehiclePreference ?? engineMode. Uses
+      // the SAME helper as AppShell's production driver so the two cannot drift.
+      mode: composeDisplayedMode(context, s.mode),
       reduceMotion: MediaQuery.of(context).disableAnimations,
       timeOfDayHours: _hourFromClock(),
     );
@@ -145,8 +158,20 @@ class _JourneyScreenState extends State<JourneyScreen>
   @override
   Widget build(BuildContext context) {
     final bool reduceMotion = MediaQuery.of(context).disableAnimations;
+    // Whether a SettingsCubit is in the tree. When absent (standalone callers /
+    // existing tests with no settings provider), the override is purely additive
+    // (preference null → follow engine mode, AC-4) and the picker affordance is
+    // omitted — the engine/cubit never depend on it (AC-9/AC-10).
+    final bool hasSettings = hasSettingsCubit(context);
     final Widget content = BlocBuilder<JourneyCubit, JourneyViewState>(
       builder: (BuildContext context, JourneyViewState s) {
+        // The cosmetic displayed mode = vehiclePreference ?? engineMode, read at
+        // this presentation seam (ADR-0007). The journey-screen affordance + the
+        // debug switcher reflect this composed value so the UI matches the scene.
+        final TravelMode? preference = hasSettings
+            ? context.watch<SettingsCubit>().state.vehiclePreference
+            : null;
+        final TravelMode displayedMode = preference ?? s.mode;
         return Stack(
           fit: StackFit.expand,
           children: <Widget>[
@@ -166,6 +191,16 @@ class _JourneyScreenState extends State<JourneyScreen>
             // "Paused — idle" overlay — real text in the semantics tree
             // (TC-020/TC-027), shown only for a real stopped state (TC-013).
             if (s.showPausedOverlay) const PausedOverlay(),
+
+            // Persistent vehicle-picker affordance (vehicle-picker AC-14 /
+            // Resolved decision 6): a small icon button showing the current
+            // vehicle; tapping opens the same icon picker, writing through the
+            // ONE SettingsCubit preference. Placed top-right BELOW the distance
+            // counter so it is clear of the occupied corners (reduce-motion
+            // top-left, distance top-right header, PiP bottom-left, minimap
+            // bottom-right) and the top-center dev dropdown. Only when a
+            // SettingsCubit is available (else there is nowhere to persist).
+            if (hasSettings) _VehicleAffordance(displayedMode: displayedMode),
           ],
         );
       },
@@ -173,14 +208,104 @@ class _JourneyScreenState extends State<JourneyScreen>
     // When the shell owns the shared game it is the single applyState driver
     // (AC-9); this screen then only renders. When standalone, drive the scene
     // here within the listener (synchronous with the state change) so motion
-    // resumes within one frame (TC-005), not a post-frame delay.
+    // resumes within one frame (TC-005), not a post-frame delay. We listen to
+    // BOTH cubits so a vehicle-preference change re-applies the composed mode
+    // within ≤1 frame (AC-1), exactly like a journey-state change.
+    if (!_ownsGame) {
+      return Scaffold(body: content);
+    }
+    // The journey-state listener always drives the scene (composing the override
+    // when a SettingsCubit is present). The shared VehiclePreferenceListener ALSO
+    // re-applies the composed mode within ≤1 frame on a live pick (AC-1) —
+    // exactly like a journey-state change, with no engine-side wiring, and a
+    // no-op when no SettingsCubit is mounted (same helper AppShell uses).
     return Scaffold(
-      body: _ownsGame
-          ? BlocListener<JourneyCubit, JourneyViewState>(
-              listener: _applyToScene,
-              child: content,
-            )
-          : content,
+      body: BlocListener<JourneyCubit, JourneyViewState>(
+        listener: _applyToScene,
+        child: VehiclePreferenceListener(
+          onPreferenceChanged: (BuildContext ctx) =>
+              _applyToScene(ctx, ctx.read<JourneyCubit>().state),
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
+/// The persistent journey-screen vehicle affordance (vehicle-picker AC-14): a
+/// small icon button showing the [displayedMode]'s glyph; tapping opens the
+/// shared [VehiclePicker] bottom sheet, which writes through the ONE
+/// `SettingsCubit` preference (AC-11). Top-right, below the distance counter.
+class _VehicleAffordance extends StatelessWidget {
+  const _VehicleAffordance({required this.displayedMode});
+
+  /// The currently displayed (composed) mode — drives the affordance's glyph and
+  /// pre-seeds the opened picker.
+  final TravelMode displayedMode;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Align(
+        // Top-right, pushed down so it sits clear of the distance counter header.
+        alignment: Alignment.topRight,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 64, right: 16),
+          child: Material(
+            color: Colors.black.withValues(alpha: 0.55),
+            shape: const CircleBorder(),
+            child: IconButton(
+              key: const Key('journey-vehicle-affordance'),
+              tooltip: 'Choose your vehicle (${vehicleLabel(displayedMode)})',
+              icon: ImageIcon(
+                AssetImage(vehicleIconAsset(displayedMode)),
+                color: Colors.white,
+              ),
+              onPressed: () => _openPicker(context),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openPicker(BuildContext context) {
+    // Capture the cubit from the journey-screen context (the picker sheet is
+    // mounted on the root navigator and may not inherit the provider).
+    final SettingsCubit settings = context.read<SettingsCubit>();
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (BuildContext sheetContext) {
+        return SafeArea(
+          child: BlocProvider<SettingsCubit>.value(
+            value: settings,
+            child: BlocBuilder<SettingsCubit, AppSettings>(
+              builder: (BuildContext context, AppSettings s) {
+                return Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Choose your vehicle',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      VehiclePicker(
+                        key: const Key('journey-vehicle-picker'),
+                        selected:
+                            s.vehiclePreference ?? TravelMode.motorbike,
+                        onSelected: settings.setVehicle,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }

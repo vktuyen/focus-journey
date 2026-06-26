@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../journey/domain/travel_mode.dart';
 import '../domain/app_settings.dart';
 import '../domain/stats_repositories.dart';
 
@@ -86,6 +87,17 @@ class SettingsCubit extends Cubit<AppSettings> {
   /// Toggles the per-type streak-reminder notifications (AC-12).
   Future<void> setStreakReminderEnabled(bool enabled) =>
       _persist(state.copyWith(streakReminderEnabled: enabled));
+
+  /// Sets the cosmetic vehicle skin preference and persists it (vehicle-picker
+  /// AC-5), mirroring [setIdleThreshold] (emit + persist via the existing
+  /// repository — no new dependency). Pass `null` to clear it ("no preference").
+  ///
+  /// **COSMETIC-ONLY (ADR-0007).** This NEVER touches the engine or any accrual
+  /// seam — it does not call [_applyIdleThreshold] or any engine knob. The pick
+  /// reaches the render only via the presentation-seam override
+  /// (`vehiclePreference ?? engineMode`), keeping the AC-9/AC-10 firewall intact.
+  Future<void> setVehicle(TravelMode? mode) =>
+      _persist(state.copyWith(vehiclePreference: mode));
 
   /// Marks the first-run onboarding as completed so it is not re-shown (AC-20).
   Future<void> markOnboardingSeen() =>

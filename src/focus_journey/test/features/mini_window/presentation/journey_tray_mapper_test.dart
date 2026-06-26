@@ -94,9 +94,7 @@ void main() {
 
     test('zeroDistance_formatsAsOneDecimal', () {
       expect(
-        JourneyTrayMapper.statusLineFor(
-          _state(motion: JourneyMotion.stopped),
-        ),
+        JourneyTrayMapper.statusLineFor(_state(motion: JourneyMotion.stopped)),
         'Paused — 0.0 km',
       );
     });

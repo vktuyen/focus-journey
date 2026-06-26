@@ -73,6 +73,36 @@ void main() {
       expect(c.alwaysOnTop, isFalse);
     });
 
+    // NFR-1: visibility is the ONE source of truth for pausing the shared game.
+    test(
+      'windowVisibilityChanges_emitsFalseOnHide_trueOnShow_deDuped',
+      () async {
+        final c = MockWindowModeController();
+        final seen = <bool>[];
+        c.windowVisibilityChanges.listen(seen.add);
+
+        await c.hideToTray(); // true -> false
+        await c.hideToTray(); // de-duped: no second false
+        await c.showApp(); // false -> true
+        await c.showApp(); // de-duped: no second true
+        await Future<void>.delayed(Duration.zero);
+
+        expect(c.isWindowVisible, isTrue);
+        expect(seen, <bool>[false, true]); // exactly one transition each way
+        await c.dispose();
+      },
+    );
+
+    test('isWindowVisible_falseWhileHiddenToTray', () async {
+      final c = MockWindowModeController();
+      expect(c.isWindowVisible, isTrue);
+      await c.hideToTray();
+      expect(c.isWindowVisible, isFalse); // scene must pause (NFR-1)
+      await c.enterCompact();
+      expect(c.isWindowVisible, isTrue); // compact is on screen
+      await c.dispose();
+    });
+
     test('enterCompact_clampsSavedPositionViaRepoSeam', () async {
       final repo = _FakePositionRepo()
         ..stored = const WindowPosition(x: -9999, y: -9999);

@@ -3,6 +3,7 @@ library;
 
 import 'package:equatable/equatable.dart';
 
+import 'activity_segment.dart';
 import 'journey_state.dart';
 import 'travel_mode.dart';
 
@@ -28,6 +29,7 @@ class JourneyProgress extends Equatable {
     required this.state,
     required this.mode,
     required DateTime storedDate,
+    this.segments = const <ActivitySegment>[],
   }) : storedDate = DateTime(storedDate.year, storedDate.month, storedDate.day);
 
   /// Cumulative distance travelled (km). Survives day boundaries (AC-9/AC-10).
@@ -55,6 +57,13 @@ class JourneyProgress extends Equatable {
   /// (TC-020).
   final DateTime storedDate;
 
+  /// The ordered activity-segment record for the stored day (idle-accounting
+  /// Decision (c)). Contiguous, gap-free, distance-keyed, merged across
+  /// consecutive same-classification spans. Persisted alongside the counters
+  /// and restored intact within the same local day; cleared on a daily reset
+  /// (a stored date earlier than today). Empty for legacy/pre-feature blobs.
+  final List<ActivitySegment> segments;
+
   /// The stored date as an ISO `yyyy-MM-dd` string (date only).
   String get storedDateIso =>
       '${storedDate.year.toString().padLeft(4, '0')}-'
@@ -71,6 +80,7 @@ class JourneyProgress extends Equatable {
     'state': state.name,
     'mode': mode.name,
     'storedDate': storedDateIso,
+    'segments': segments.map((s) => s.toJson()).toList(growable: false),
   };
 
   /// Reconstructs a snapshot from [toJson]'s output, **degrading safely** instead
@@ -93,7 +103,29 @@ class JourneyProgress extends Equatable {
       state: _stateByName(json['state'] as String?),
       mode: _modeByName(json['mode'] as String?),
       storedDate: _parseIsoDate(json['storedDate']),
+      segments: _readSegments(json['segments']),
     );
+  }
+
+  /// Parses the persisted segment list. Absent (legacy/pre-feature blob) →
+  /// empty list; a non-list value throws [FormatException] (the data layer's
+  /// `load()` then treats the whole blob as "no saved progress"). Each element
+  /// degrades via [ActivitySegment.fromJson].
+  static List<ActivitySegment> _readSegments(Object? value) {
+    if (value == null) {
+      return const <ActivitySegment>[];
+    }
+    if (value is! List) {
+      throw const FormatException('segments is not a list');
+    }
+    return value
+        .map((e) {
+          if (e is! Map<String, dynamic>) {
+            throw const FormatException('segment entry is not an object');
+          }
+          return ActivitySegment.fromJson(e);
+        })
+        .toList(growable: false);
   }
 
   static double _readDouble(Object? value, String field) {
@@ -161,5 +193,6 @@ class JourneyProgress extends Equatable {
     state,
     mode,
     storedDate,
+    segments,
   ];
 }

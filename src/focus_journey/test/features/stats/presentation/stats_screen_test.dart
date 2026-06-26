@@ -14,8 +14,8 @@
 //   TC-003  best focus period is rendered as its own labelled value
 //
 // Conventions mirror test/features/journey/presentation/journey_screen_test.dart
-// and route_map_screen_test.dart (pumpWidget + BlocProvider.value, Key-based
-// finders, FixedClock).
+// and route/presentation/map_surface_test.dart (pumpWidget + BlocProvider.value,
+// Key-based finders, FixedClock).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

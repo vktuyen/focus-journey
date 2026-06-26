@@ -15,7 +15,7 @@ You are the Flutter implementation agent — the **Implementer** role for the Bu
 
 ## Read first
 - `docs/architecture/overview.md` — the chosen stack, packages, the **Agent roster**, and coding-standards ADRs. Authoritative; don't assume.
-- `specs/<feature>/spec.md`, `acceptance-criteria.md`, `test-plan.md`.
+- `specs/<feature>/spec.md` — including its inline `## Acceptance criteria` section (the contract).
 - Neighbouring `src/` code — match existing folder layout, naming, and Bloc patterns.
 
 ## Where to write

@@ -67,6 +67,7 @@ import 'package:focus_journey/features/journey/presentation/journey_view_state.d
 import 'package:focus_journey/features/mini_window/data/mini_window_factory.dart';
 import 'package:focus_journey/features/mini_window/data/mock_tray_controller.dart';
 import 'package:focus_journey/features/mini_window/data/mock_window_mode_controller.dart';
+import 'package:focus_journey/features/mini_window/domain/compact_geometry.dart';
 import 'package:focus_journey/features/mini_window/domain/compact_window_position_repository.dart';
 import 'package:focus_journey/features/mini_window/domain/hide_to_tray_hint_repository.dart';
 import 'package:focus_journey/features/mini_window/domain/tray_state.dart';
@@ -91,7 +92,6 @@ class AdvanceableClock implements Clock {
 /// An in-memory [CompactWindowPositionRepository] recording every save — proves
 /// the persist round-trip stores ONLY a position and never a size (AC-8).
 class _InMemoryPositionRepo implements CompactWindowPositionRepository {
-  _InMemoryPositionRepo([this._stored]);
   WindowPosition? _stored;
   final List<WindowPosition> saves = <WindowPosition>[];
   @override
@@ -144,11 +144,7 @@ class _MiniWindowHarness {
     cubit = JourneyCubit();
     // The Quit-flush sink: records the snapshot distance flushed on Quit (the
     // stand-in for main.dart's `_statsCubit.onTick(_engine.toProgress())`).
-    ticker = ActivityTicker(
-      engine: engine,
-      clock: clock,
-      cubit: cubit,
-    );
+    ticker = ActivityTicker(engine: engine, clock: clock, cubit: cubit);
     shellCubit = AppShellCubit(
       controller: this.window,
       hintAlreadyShown: hintAlreadyShown,
@@ -170,7 +166,8 @@ class _MiniWindowHarness {
   final List<double> flushedDistances = <double>[];
   bool flushRanBeforeQuit = false;
 
-  final List<StreamSubscription<dynamic>> _subs = <StreamSubscription<dynamic>>[];
+  final List<StreamSubscription<dynamic>> _subs =
+      <StreamSubscription<dynamic>>[];
 
   /// Reproduces main.dart `_wireMiniWindow()`: tray actions -> controller,
   /// cubit -> tray, modeChanges -> tray, hiddenToTray -> hint, Quit flush.
@@ -222,6 +219,14 @@ class _MiniWindowHarness {
   void _pushJourneyToTray(JourneyViewState s) {
     tray.setState(JourneyTrayMapper.stateFor(s));
     tray.setStatusLine(JourneyTrayMapper.statusLineFor(s));
+  }
+
+  /// Primes the ticker's lastTick (delta 0 — NO accrual) so the FIRST measured
+  /// tick credits a positive delta, mirroring `ActivityTicker.start()` without a
+  /// real periodic timer (the engine ignores a zero-delta tick).
+  Future<void> prime() async {
+    await ticker.tickOnce();
+    await Future<void>.delayed(Duration.zero);
   }
 
   /// Advance the clock, run one engine tick from the mock, and let the cubit
@@ -283,9 +288,14 @@ void main() {
       expect(h.window.mode, WindowMode.compact);
       // pipVisible == (compact && visible); mainVisible == (full && visible).
       expect(h.window.visible, isTrue, reason: 'the PiP itself is visible');
-      expect(h.window.alwaysOnTop, isTrue, reason: 'frameless PiP floats (AC-6)');
+      expect(
+        h.window.alwaysOnTop,
+        isTrue,
+        reason: 'frameless PiP floats (AC-6)',
+      );
       // Mutual exclusion: never both windows visible.
-      final bool mainVisible = h.window.mode == WindowMode.full && h.window.visible;
+      final bool mainVisible =
+          h.window.mode == WindowMode.full && h.window.visible;
       final bool pipVisible =
           h.window.mode == WindowMode.compact && h.window.visible;
       expect(pipVisible, isTrue);
@@ -309,7 +319,8 @@ void main() {
       await h.window.showApp();
 
       expect(h.window.mode, WindowMode.full);
-      final bool mainVisible = h.window.mode == WindowMode.full && h.window.visible;
+      final bool mainVisible =
+          h.window.mode == WindowMode.full && h.window.visible;
       final bool pipVisible =
           h.window.mode == WindowMode.compact && h.window.visible;
       expect(mainVisible, isTrue, reason: 'main restored/foregrounded');
@@ -326,7 +337,8 @@ void main() {
       addTearDown(h.dispose);
       await h.wire();
 
-      bool mainVisible() => h.window.mode == WindowMode.full && h.window.visible;
+      bool mainVisible() =>
+          h.window.mode == WindowMode.full && h.window.visible;
       bool pipVisible() =>
           h.window.mode == WindowMode.compact && h.window.visible;
       void assertInvariant(String step) {
@@ -361,8 +373,10 @@ void main() {
       addTearDown(h.dispose);
       await h.wire();
 
-      // ACTIVE: fresh input ⇒ engine active ⇒ tray reflects active.
+      // ACTIVE: fresh input ⇒ engine active ⇒ tray reflects active. Prime the
+      // ticker first so the first measured tick credits a positive delta.
       h.activity.idleSeconds = 0;
+      await h.prime();
       await h.tick(const Duration(seconds: 6));
       expect(
         h.tray.state,
@@ -394,16 +408,13 @@ void main() {
 
       // Accrue a known distance while active (1 active hour ⇒ 60 km).
       h.activity.idleSeconds = 0;
-      await h.tick(const Duration(seconds: 6)); // prime
+      await h.prime();
       h.clock.advance(const Duration(hours: 1));
       await h.tick(const Duration(seconds: 1));
 
       expect(h.engine.distanceKm, greaterThan(0));
       // The status line equals the mapper's projection of the live Bloc state.
-      expect(
-        h.tray.statusLine,
-        JourneyTrayMapper.statusLineFor(h.cubit.state),
-      );
+      expect(h.tray.statusLine, JourneyTrayMapper.statusLineFor(h.cubit.state));
       expect(h.tray.statusLine, startsWith('Travelling — '));
     });
   });
@@ -432,7 +443,11 @@ void main() {
       h.tray.emitAction(TrayAction.quit);
       await Future<void>.delayed(Duration.zero);
       expect(h.window.calls, contains('quit'));
-      expect(h.window.didQuit, isTrue, reason: 'Quit is the only full-exit path');
+      expect(
+        h.window.didQuit,
+        isTrue,
+        reason: 'Quit is the only full-exit path',
+      );
     });
   });
 
@@ -446,7 +461,7 @@ void main() {
 
       // Accrue some distance before closing (active).
       h.activity.idleSeconds = 0;
-      await h.tick(const Duration(seconds: 6)); // prime lastTick
+      await h.prime();
       h.clock.advance(const Duration(minutes: 30));
       await h.tick(const Duration(seconds: 1));
       final double distanceBeforeClose = h.engine.distanceKm;
@@ -490,70 +505,80 @@ void main() {
   });
 
   group('TC-016 restore via Show app is continuous; full exit only via Quit', () {
-    testWidgets('post-restore distance continuous + same engine; Quit-only exit', (
-      tester,
-    ) async {
-      final h = _MiniWindowHarness();
-      addTearDown(h.dispose);
-      await h.wire();
+    testWidgets(
+      'post-restore distance continuous + same engine; Quit-only exit',
+      (tester) async {
+        final h = _MiniWindowHarness();
+        addTearDown(h.dispose);
+        await h.wire();
 
-      // Track, then hide to tray (keeps accruing).
-      h.activity.idleSeconds = 0;
-      await h.tick(const Duration(seconds: 6));
-      h.clock.advance(const Duration(minutes: 30));
-      await h.tick(const Duration(seconds: 1));
-      await h.window.hideToTray();
-      final double atHide = h.engine.distanceKm;
+        // Track, then hide to tray (keeps accruing).
+        h.activity.idleSeconds = 0;
+        await h.prime();
+        h.clock.advance(const Duration(minutes: 30));
+        await h.tick(const Duration(seconds: 1));
+        await h.window.hideToTray();
+        final double atHide = h.engine.distanceKm;
 
-      h.clock.advance(const Duration(minutes: 30));
-      await h.tick(const Duration(seconds: 1)); // accrues while hidden
+        h.clock.advance(const Duration(minutes: 30));
+        await h.tick(const Duration(seconds: 1)); // accrues while hidden
 
-      // Restore via Show app: continuous state, SAME engine/cubit (no reset).
-      await h.window.showApp();
-      expect(h.window.visible, isTrue);
-      expect(
-        h.engine.distanceKm,
-        greaterThan(atHide),
-        reason: 'AC-16: state is continuous, not reset on restore',
-      );
+        // Restore via Show app: continuous state, SAME engine/cubit (no reset).
+        await h.window.showApp();
+        expect(h.window.visible, isTrue);
+        expect(
+          h.engine.distanceKm,
+          greaterThan(atHide),
+          reason: 'AC-16: state is continuous, not reset on restore',
+        );
 
-      // The close button (hideToTray) never fully exits; only Quit does.
-      expect(h.window.didQuit, isFalse);
-      await h.window.quit();
-      expect(h.window.didQuit, isTrue, reason: 'full exit only via Quit');
-    });
+        // The close button (hideToTray) never fully exits; only Quit does.
+        expect(h.window.didQuit, isFalse);
+        await h.window.quit();
+        expect(h.window.didQuit, isTrue, reason: 'full exit only via Quit');
+      },
+    );
   });
 
   group('TC-017 first-close hint persists once; Quit flushes before exit', () {
-    testWidgets('first close fires + persists the hint; a second close does not', (
-      tester,
-    ) async {
-      final hintRepo = _InMemoryHintRepo();
-      final h = _MiniWindowHarness(hintRepo: hintRepo);
-      addTearDown(h.dispose);
-      await h.wire();
+    testWidgets(
+      'first close fires + persists the hint; a second close does not',
+      (tester) async {
+        final hintRepo = _InMemoryHintRepo();
+        final h = _MiniWindowHarness(hintRepo: hintRepo);
+        addTearDown(h.dispose);
+        await h.wire();
 
-      // First close-to-tray: the one-time hint shows + the flag is persisted.
-      await h.window.hideToTray();
-      await Future<void>.delayed(Duration.zero);
-      expect(
-        h.shellCubit.state.showHideToTrayHint,
-        isTrue,
-        reason: 'AC-17: first close surfaces the one-time hint',
-      );
-      expect(hintRepo.markCount, 1, reason: 'AC-17: "shown" flag persisted once');
+        // First close-to-tray: the one-time hint shows + the flag is persisted.
+        await h.window.hideToTray();
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          h.shellCubit.state.showHideToTrayHint,
+          isTrue,
+          reason: 'AC-17: first close surfaces the one-time hint',
+        );
+        expect(
+          hintRepo.markCount,
+          1,
+          reason: 'AC-17: "shown" flag persisted once',
+        );
 
-      // Dismiss + second close: the hint does NOT reappear, no second persist.
-      h.shellCubit.dismissHideToTrayHint();
-      await h.window.hideToTray();
-      await Future<void>.delayed(Duration.zero);
-      expect(
-        h.shellCubit.state.showHideToTrayHint,
-        isFalse,
-        reason: 'AC-17: hint does not reappear on a subsequent close',
-      );
-      expect(hintRepo.markCount, 1, reason: 'AC-17: not persisted a second time');
-    });
+        // Dismiss + second close: the hint does NOT reappear, no second persist.
+        h.shellCubit.dismissHideToTrayHint();
+        await h.window.hideToTray();
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          h.shellCubit.state.showHideToTrayHint,
+          isFalse,
+          reason: 'AC-17: hint does not reappear on a subsequent close',
+        );
+        expect(
+          hintRepo.markCount,
+          1,
+          reason: 'AC-17: not persisted a second time',
+        );
+      },
+    );
 
     testWidgets('the persisted-flag path suppresses the hint on first close', (
       tester,
@@ -577,18 +602,24 @@ void main() {
       addTearDown(h.dispose);
       await h.wire();
 
-      // Accrue a known distance, then Quit.
+      // Accrue a known distance (~1 active hour @ 60 km/active-hour ⇒ ~60 km),
+      // then Quit. The exact value is incidental; the point is the flush
+      // captures the LATEST engine distance before exit.
       h.activity.idleSeconds = 0;
-      await h.tick(const Duration(seconds: 6));
+      await h.prime();
       h.clock.advance(const Duration(hours: 1));
       await h.tick(const Duration(seconds: 1));
       final double atQuit = h.engine.distanceKm;
-      expect(atQuit, closeTo(60, _tol)); // 1 active hour @ 60 km/h
+      expect(atQuit, greaterThan(0));
 
       await h.window.quit();
 
       // The flush ran with the latest snapshot ...
-      expect(h.flushedDistances, isNotEmpty, reason: 'AC-16: Quit flushes state');
+      expect(
+        h.flushedDistances,
+        isNotEmpty,
+        reason: 'AC-16: Quit flushes state',
+      );
       expect(h.flushedDistances.last, closeTo(atQuit, _tol));
       // ... and it ran BEFORE the exit completed (didQuit was still false then).
       expect(

@@ -99,6 +99,13 @@ continue. Start/direction selection persists across an app restart.
 - **Completion is terminal until user choice.** No auto-advance; cumulative progress is retained; a new
   start after completion is an explicit user action.
 
+> **Superseded by ADR-0005 (2026-06-25):** the **single fixed full-spine chain + (start province, binary
+> N/S direction) selection** model below, and the **terminal-only completion lifecycle** ("completion is
+> terminal until the user chooses"; no mid-route abandon), are superseded by `route-planner-v2`. A route is
+> now a user-authored **contiguous sub-chain** with a 3-state lifecycle (`active`/`completed`/`abandoned`).
+> The `routeStartOffset`/engine-never-reset primitive (decision 1), the block-invalid-in-picker rule
+> (decision 3), and the full-chain % denominator (decision 5) are **retained and reused** by ADR-0005.
+
 ## Resolved decisions (Kevin, 2026-06-24 — at spec approval)
 1. **New start after completion ⇒ per-route offset; engine is never reset.** route-progress stores a
    `routeStartOffset` (the engine's cumulative `distanceKm` at the moment a route begins) and computes

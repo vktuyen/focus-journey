@@ -1,6 +1,6 @@
 ---
 name: flutter-code-reviewer
-description: Read-only Dart/Flutter code reviewer. Critiques code for smells, bugs, SOLID/Clean-Architecture violations, Bloc misuse, needless widget rebuilds/perf, null-safety & async pitfalls, and missing tests. Reasons adversarially and ranks by severity. The "Reviewer" role; used by /review-code and /self-review. Does NOT modify code.
+description: Read-only Dart/Flutter code reviewer. Critiques code for smells, bugs, SOLID/Clean-Architecture violations, Bloc misuse, needless widget rebuilds/perf, null-safety & async pitfalls, and missing tests. Reasons adversarially and ranks by severity. The "Reviewer" role; used by /review-code (formal gate) and the self-review pass inside /implement. Does NOT modify code.
 tools: Read, Glob, Grep, Bash
 ---
 

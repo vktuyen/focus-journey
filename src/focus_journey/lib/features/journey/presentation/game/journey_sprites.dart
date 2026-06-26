@@ -67,6 +67,48 @@ class JourneySprites {
   /// The image for a side-object [kind], or `null` if it failed.
   Image? imageForKind(SideObjectKind kind) => imageFor(_kindPath(kind));
 
+  /// Far-background mountain-range silhouette band, or `null` if it failed.
+  /// journey-scene-v2 #11 / AC-8.
+  Image? get mountainRange => imageFor(JourneyAssets.mountainRange);
+
+  /// Far-background rolling-hill band, or `null` if it failed.
+  Image? get hills => imageFor(JourneyAssets.hills);
+
+  /// Larger/deeper rolling-hill band for the highland theme, or `null` if it
+  /// failed. P1 dead-weight fix — drawn behind [mountainRange] in theme 0.
+  Image? get hillsLarge => imageFor(JourneyAssets.hillsLarge);
+
+  /// Highland foreground peak silhouette A, or `null` if it failed.
+  Image? get mountainPeakA => imageFor(JourneyAssets.mountainPeakA);
+
+  /// Highland foreground peak silhouette B, or `null` if it failed.
+  Image? get mountainPeakB => imageFor(JourneyAssets.mountainPeakB);
+
+  /// Highland foreground peak silhouette C, or `null` if it failed.
+  Image? get mountainPeakC => imageFor(JourneyAssets.mountainPeakC);
+
+  /// Far-background beach/coast silhouette band, or `null` if it failed.
+  /// journey-scene-art-v3 / AC-5: drawn as one more far parallax band cycling by
+  /// scroll phase alongside [mountainRange]/[hills] — no geographic logic.
+  Image? get coastBand => imageFor(JourneyAssets.coastBand);
+
+  /// Sun disc for the day sky, or `null` if it failed. Placed by the cosmetic
+  /// `timeOfDayHours` (no clock read); a null skips it (procedural sky stands
+  /// in — AC-14).
+  Image? get sun => imageFor(JourneyAssets.skySun);
+
+  /// Moon disc for the night sky, or `null` if it failed. (See [sun].)
+  Image? get moon => imageFor(JourneyAssets.skyMoon);
+
+  /// Drifting cloud sprite 1 (slow scroll-phase parallax), or `null` if failed.
+  Image? get cloud1 => imageFor(JourneyAssets.skyCloud1);
+
+  /// Drifting cloud sprite 2 (slow scroll-phase parallax), or `null` if failed.
+  Image? get cloud2 => imageFor(JourneyAssets.skyCloud2);
+
+  /// Drifting cloud sprite 3 (slow scroll-phase parallax), or `null` if failed.
+  Image? get cloud3 => imageFor(JourneyAssets.skyCloud3);
+
   /// Loads every manifest asset, degrading gracefully on failure. Always
   /// completes (never rethrows) so scene startup cannot be blocked by a
   /// missing file. Idempotent.
@@ -123,14 +165,48 @@ class JourneySprites {
 
   static String _kindPath(SideObjectKind kind) {
     switch (kind) {
-      case SideObjectKind.tree:
-        return JourneyAssets.tree;
-      case SideObjectKind.house:
-        return JourneyAssets.house;
-      case SideObjectKind.streetLight:
-        return JourneyAssets.streetLight;
-      case SideObjectKind.sign:
-        return JourneyAssets.sign;
+      case SideObjectKind.pine:
+        return JourneyAssets.forestPine;
+      case SideObjectKind.treeRound:
+        return JourneyAssets.forestTreeRound;
+      case SideObjectKind.treeTall:
+        return JourneyAssets.forestTreeTall;
+      case SideObjectKind.sapling:
+        return JourneyAssets.forestSapling;
+      case SideObjectKind.bush:
+        return JourneyAssets.countrysideBush;
+      case SideObjectKind.bushAlt:
+        return JourneyAssets.countrysideBushAlt;
+      case SideObjectKind.fence:
+        return JourneyAssets.countrysideFence;
+      case SideObjectKind.fenceIron:
+        return JourneyAssets.countrysideFenceIron;
+      case SideObjectKind.houseGable:
+        return JourneyAssets.cityHouseGable;
+      case SideObjectKind.houseSmall:
+        return JourneyAssets.cityHouseSmall;
+      case SideObjectKind.houseGableAlt:
+        return JourneyAssets.cityHouseGableAlt;
+      case SideObjectKind.houseSmallAlt:
+        return JourneyAssets.cityHouseSmallAlt;
+      case SideObjectKind.person:
+        return JourneyAssets.peopleMan;
+      case SideObjectKind.personWave:
+        return JourneyAssets.peopleManPoint;
+      case SideObjectKind.personWoman:
+        return JourneyAssets.peopleWoman;
+      case SideObjectKind.personWomanWave:
+        return JourneyAssets.peopleWomanPoint;
+      case SideObjectKind.palm:
+        return JourneyAssets.forestPalm;
+      case SideObjectKind.waterBuffalo:
+        return JourneyAssets.animalWaterBuffalo;
+      case SideObjectKind.dog:
+        return JourneyAssets.animalDog;
+      case SideObjectKind.chicken:
+        return JourneyAssets.animalChicken;
+      case SideObjectKind.bird:
+        return JourneyAssets.animalBird;
     }
   }
 }

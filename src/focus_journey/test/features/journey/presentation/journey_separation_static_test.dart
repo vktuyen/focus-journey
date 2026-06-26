@@ -25,7 +25,11 @@ const List<String> _journeyViewFiles = <String>[
   'lib/features/journey/presentation/game/scene_motion.dart',
   'lib/features/journey/presentation/game/side_object_pool.dart',
   'lib/features/journey/presentation/game/road_painter.dart',
+  'lib/features/journey/presentation/game/road_geometry.dart',
   'lib/features/journey/presentation/game/day_night_tint.dart',
+  // journey-pov: the first-person cockpit foreground painter is a scene sibling
+  // and must obey the same pure-view separation invariant (AC-9).
+  'lib/features/journey/presentation/game/cockpit_painter.dart',
 ];
 
 Directory _packageRoot() {
@@ -185,6 +189,60 @@ void main() {
           );
         }
       });
+    });
+  });
+
+  group('journey-scene-v2 AC-2 — scroll rate is one-way (engine ⇏ scene)', () {
+    // The engine + its distance/progress computation must hold NO reference to
+    // the scene's scroll offset / rate / playback factor. The scroll constants
+    // live in the presentation layer only (scene_motion.dart).
+    const engineFiles = <String>[
+      'lib/features/journey/domain/journey_engine.dart',
+      'lib/features/journey/domain/journey_progress.dart',
+      'lib/features/journey/domain/journey_state.dart',
+      'lib/features/journey/presentation/activity_ticker.dart',
+    ];
+    // Render-only tokens that must never appear in the engine/domain/ticker.
+    const renderTokens = <String>[
+      'scrollOffset',
+      'roadScrollOffset',
+      'cruiseSpeed',
+      'kV1CruiseSpeed',
+      'kV2CruiseSpeed',
+      'kV2PlaybackFactor',
+      'SceneMotion',
+      'JourneyGame',
+      'road_painter',
+    ];
+
+    test('engineAndDomainHoldNoScrollOrPlaybackReference', () {
+      final violations = <String>[];
+      for (final rel in engineFiles) {
+        final file = File('${root.path}/$rel');
+        expect(file.existsSync(), isTrue, reason: 'missing source: $rel');
+        final src = _stripComments(file.readAsStringSync());
+        for (final token in renderTokens) {
+          if (src.contains(token)) {
+            violations.add('$rel references render token "$token"');
+          }
+        }
+      }
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            'engine/progress/elapsed must not read any rendered-scroll value '
+            '(one-way dependency, AC-2):\n${violations.join('\n')}',
+      );
+    });
+
+    test('scrollConstantsLiveInPresentationOnly', () {
+      // The pinned constants are declared in scene_motion (presentation).
+      final motion = File(
+        '${root.path}/lib/features/journey/presentation/game/scene_motion.dart',
+      ).readAsStringSync();
+      expect(motion.contains('kV1CruiseSpeed'), isTrue);
+      expect(motion.contains('kV2PlaybackFactor'), isTrue);
     });
   });
 

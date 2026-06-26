@@ -15,9 +15,32 @@
 ///    conveyed by other means (vehicle pose / overlay).
 library;
 
+/// The PINNED v1 rendered cruise speed (logical px/s) — the journey-view
+/// baseline (journey-scene-v2 AC-1). This is the value the v2 ~0.33× factor is
+/// measured against; it is a **render** constant only (cosmetic playback rate),
+/// never an engine number. Do NOT change it without re-pinning the AC-1 test
+/// baseline (tests/cases/journey-scene-v2.md TC-001).
+const double kV1CruiseSpeed = 320.0;
+
+/// journey-scene-v2 #3 / AC-1 / Decision (c): the v2 rendered scroll rate is a
+/// COSMETIC playback rate ≈ 0.33× of v1 (≈3× slower), making the trip read as
+/// calm. This scales the **rendered** scroll only — it must NEVER be read as,
+/// or feed back into, engine distance/progress/elapsed (AC-2). The scene reads
+/// engine truth; engine truth never reads this.
+const double kV2PlaybackFactor = 0.33;
+
+/// The v2 production rendered cruise speed (logical px/s): the pinned v1 rate
+/// scaled by the cosmetic playback factor. ≈105.6 px/s.
+const double kV2CruiseSpeed = kV1CruiseSpeed * kV2PlaybackFactor;
+
 /// Drives a single scalar scroll `offset` from a binary moving/stopped target
 /// through a capped linear ease. Reused by the road, lane markings and side
 /// objects so they all share one phase and one shared speed.
+///
+/// journey-scene-v2 AC-1/AC-2: the configured [cruiseSpeed] is purely a
+/// rendered playback rate. Production wires it to [kV2CruiseSpeed] (≈0.33× of
+/// the pinned [kV1CruiseSpeed]); the engine's distanceKm / progress / elapsed
+/// are computed entirely outside this class and are unaffected by it.
 class SceneMotion {
   /// Creates a motion model.
   ///
@@ -98,10 +121,12 @@ class SceneMotion {
   }
 
   /// Resets to the parked/stopped default (zero offset, zero velocity, not
-  /// moving). Used for the first-frame default and for test isolation.
+  /// moving, reduce-motion off). Used for the first-frame default and for test
+  /// isolation.
   void reset() {
     _offset = 0;
     _velocity = 0;
     _movingTarget = false;
+    _reduceMotion = false;
   }
 }

@@ -165,6 +165,37 @@ void main() {
     );
   });
 
+  group('JourneyCubit — idle counter reconciliation (idle-accounting AC-2)', () {
+    test('emittedIdleTimeToday_equalsEngineAccumulator_divergence0', () {
+      final cubit = JourneyCubit();
+      addTearDown(cubit.close);
+      // G = T = 5min default; idle 400s ⇒ paused, accrues idle.
+      final engine = _engine();
+
+      engine.tick(
+        const Duration(minutes: 1),
+        idleSeconds: 400,
+        screenLocked: false,
+      );
+      cubit.updateFromEngine(engine);
+
+      // The displayed counter is the engine accumulator read verbatim — exact
+      // equality (no tolerance), so UI and accounting agree with divergence 0.
+      expect(cubit.state.idleTimeToday, engine.idleTimeToday);
+      expect(cubit.state.idleTimeToday, const Duration(minutes: 1));
+
+      // A second idle tick: the displayed value tracks the accumulator exactly.
+      engine.tick(
+        const Duration(minutes: 1),
+        idleSeconds: 400,
+        screenLocked: false,
+      );
+      cubit.updateFromEngine(engine);
+      expect(cubit.state.idleTimeToday, engine.idleTimeToday);
+      expect(cubit.state.idleTimeToday, const Duration(minutes: 2));
+    });
+  });
+
   group('JourneyCubit — equality skips redundant emits', () {
     blocTest<JourneyCubit, JourneyViewState>(
       'twoIdenticalSnapshots_emitOnlyOnce',

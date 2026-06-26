@@ -100,4 +100,71 @@ void main() {
     final compact = tester.widget<CompactView>(find.byType(CompactView));
     expect(identical(compact.sharedGame, sharedGame), isTrue);
   });
+
+  testWidgets('B1 (NFR-1): activeThenHideToTray_pausesSharedGame', (
+    tester,
+  ) async {
+    final controller = MockWindowModeController();
+    addTearDown(controller.dispose);
+    final cubit = _ScriptableJourneyCubit();
+    addTearDown(cubit.close);
+    final shellCubit = AppShellCubit(controller: controller);
+    addTearDown(shellCubit.close);
+
+    final JourneyGame game = JourneyGame();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiBlocProvider(
+          providers: <BlocProvider<dynamic>>[
+            BlocProvider<JourneyCubit>.value(value: cubit),
+            BlocProvider<AppShellCubit>.value(value: shellCubit),
+          ],
+          child: AppShell(
+            clock: _FixedClock(DateTime(2026, 6, 24, 12)),
+            controller: controller,
+            gameFactory: () => game,
+            fullBuilder: (g) =>
+                Scaffold(body: GameWidget<JourneyGame>(game: g)),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    _drainAssetException(tester);
+
+    // Active journey + visible window → the scene runs (NFR-1).
+    cubit.push(
+      const JourneyViewState(
+        motion: JourneyMotion.moving,
+        mode: TravelMode.motorbike,
+        distanceKm: 1.0,
+        hasRealState: true,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    _drainAssetException(tester);
+    expect(game.paused, isFalse, reason: 'active + visible should run');
+
+    // Close→hide-to-tray while STILL active. On desktop this does NOT change
+    // AppLifecycleState, so the scene must be paused by the visibility seam.
+    await controller.hideToTray();
+    await tester.pump();
+    await tester.pump();
+    _drainAssetException(tester);
+
+    expect(
+      game.paused,
+      isTrue,
+      reason: 'hidden-to-tray while active must pause the scene (B1/NFR-1)',
+    );
+
+    // Re-show the window → the scene resumes (still active).
+    await controller.showApp();
+    await tester.pump();
+    await tester.pump();
+    _drainAssetException(tester);
+    expect(game.paused, isFalse, reason: 'visible + active should resume');
+  });
 }

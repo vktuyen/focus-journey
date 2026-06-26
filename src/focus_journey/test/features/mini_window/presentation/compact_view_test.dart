@@ -8,6 +8,7 @@
 // missing ship.png); its orphan "Unable to load asset" rejection is drained via
 // tester.takeException so it does not mask real failures.
 
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,8 @@ import 'package:focus_journey/features/journey/presentation/journey_overlays.dar
 import 'package:focus_journey/features/journey/presentation/journey_view_state.dart';
 import 'package:focus_journey/features/journey/domain/travel_mode.dart';
 import 'package:focus_journey/features/mini_window/data/mock_window_mode_controller.dart';
+import 'package:focus_journey/features/mini_window/domain/window_mode.dart';
+import 'package:focus_journey/features/mini_window/presentation/app_shell_cubit.dart';
 import 'package:focus_journey/features/mini_window/presentation/compact_view.dart';
 import 'package:focus_journey/features/mini_window/presentation/journey_tray_mapper.dart';
 import 'package:focus_journey/features/mini_window/domain/tray_state.dart';
@@ -38,11 +41,21 @@ Future<_ScriptableJourneyCubit> _pumpCompact(
 ) async {
   final cubit = _ScriptableJourneyCubit();
   addTearDown(cubit.close);
+  // CompactView's expand control reads the AppShellCubit (see BUG-1 fix); the
+  // shell is part of the app's MultiBlocProvider in production, so provide it
+  // here too. The controller is driven to compact first so the cubit seeds in
+  // compact mode (it is only ever shown while compact).
+  await controller.enterCompact();
+  final shellCubit = AppShellCubit(controller: controller);
+  addTearDown(shellCubit.close);
   final game = JourneyGame();
   await tester.pumpWidget(
     MaterialApp(
-      home: BlocProvider<JourneyCubit>.value(
-        value: cubit,
+      home: MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<JourneyCubit>.value(value: cubit),
+          BlocProvider<AppShellCubit>.value(value: shellCubit),
+        ],
         child: CompactView(sharedGame: game, controller: controller),
       ),
     ),
@@ -102,9 +115,10 @@ void main() {
 
       // Drag the compact body: it should start an OS window-move via the seam
       // (AC-6) and persist the settled position on release (AC-8) — never
-      // importing window_manager into presentation.
+      // importing window_manager into presentation. Drag from the CENTER so the
+      // pan lands on the body, not the top-right expand control.
       await tester.drag(
-        find.byType(CompactView),
+        find.byType(GameWidget<JourneyGame>),
         const Offset(30, 30),
         warnIfMissed: false,
       );
@@ -113,6 +127,42 @@ void main() {
 
       expect(controller.calls, contains('startDragging'));
       expect(controller.calls, contains('persistCompactPosition'));
+    });
+
+    // BUG-1: the compact PiP must offer a way back to full. The expand control
+    // is rendered over the scene and, when tapped, asks the AppShellCubit to
+    // showApp() (→ controller.showApp() → exitFull() while compact). It must be
+    // layered ABOVE the drag region so its tap is NOT swallowed by the
+    // window-move pan.
+    testWidgets('rendersExpandRestoreControl', (tester) async {
+      final controller = MockWindowModeController();
+      addTearDown(controller.dispose);
+      await _pumpCompact(tester, controller);
+
+      expect(find.byIcon(Icons.open_in_full), findsOneWidget);
+      expect(find.byTooltip('Back to full window'), findsOneWidget);
+    });
+
+    testWidgets('tapExpandControl_restoresFullViaControllerSeam', (
+      tester,
+    ) async {
+      final controller = MockWindowModeController();
+      addTearDown(controller.dispose);
+      await _pumpCompact(tester, controller);
+      // Ignore the enterCompact recorded during pump setup; assert the tap
+      // produces the restore call (showApp → exitFull while compact).
+      controller.calls.clear();
+
+      await tester.tap(find.byIcon(Icons.open_in_full));
+      await tester.pump();
+      _drainAssetException(tester);
+
+      // showApp() routes to exitFull() while compact (BUG-1), and the tap must
+      // NOT have started a window-move drag (it sits above the drag region).
+      expect(controller.calls, contains('showApp'));
+      expect(controller.calls, contains('exitFull'));
+      expect(controller.calls, isNot(contains('startDragging')));
+      expect(controller.mode, WindowMode.full);
     });
   });
 

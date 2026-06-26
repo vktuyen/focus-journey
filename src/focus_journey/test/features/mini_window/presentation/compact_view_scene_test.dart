@@ -68,7 +68,9 @@ Future<_ScriptableJourneyCubit> _pump(
 }) async {
   final cubit = _ScriptableJourneyCubit();
   addTearDown(cubit.close);
-  game.onGameResize(Vector2(CompactGeometryTestSize.w, CompactGeometryTestSize.h));
+  game.onGameResize(
+    Vector2(CompactGeometryTestSize.w, CompactGeometryTestSize.h),
+  );
   await tester.pumpWidget(
     MediaQuery(
       data: MediaQueryData(disableAnimations: reduceMotion),
@@ -118,30 +120,29 @@ List<double> _pumpGame(JourneyGame game, {int frames = 60}) {
 
 void main() {
   group('CompactView scene as a pure view (mini-window)', () {
-    testWidgets(
-      'TC-001 active_compactSceneScrolls_andReadoutShowsDistance',
-      (tester) async {
-        final controller = MockWindowModeController();
-        addTearDown(controller.dispose);
-        final game = JourneyGame();
-        final cubit = await _pump(tester, game: game, controller: controller);
+    testWidgets('TC-001 active_compactSceneScrolls_andReadoutShowsDistance', (
+      tester,
+    ) async {
+      final controller = MockWindowModeController();
+      addTearDown(controller.dispose);
+      final game = JourneyGame();
+      final cubit = await _pump(tester, game: game, controller: controller);
 
-        await _apply(tester, cubit, game, _moving(distanceKm: 42.0));
-        // The compact instance of the shared scene scrolls forward (motion
-        // advances monotonically across explicit update pumps).
-        final offsets = _pumpGame(game, frames: 120);
-        for (int i = 1; i < offsets.length; i++) {
-          expect(offsets[i], greaterThanOrEqualTo(offsets[i - 1] - kEps));
-        }
-        expect(offsets.last, greaterThan(offsets.first));
-        expect(game.isVehicleRunning, isTrue);
+      await _apply(tester, cubit, game, _moving(distanceKm: 42.0));
+      // The compact instance of the shared scene scrolls forward (motion
+      // advances monotonically across explicit update pumps).
+      final offsets = _pumpGame(game, frames: 120);
+      for (int i = 1; i < offsets.length; i++) {
+        expect(offsets[i], greaterThanOrEqualTo(offsets[i - 1] - kEps));
+      }
+      expect(offsets.last, greaterThan(offsets.first));
+      expect(game.isVehicleRunning, isTrue);
 
-        await tester.pump();
-        _drainAssetException(tester);
-        // The readout shows the live distance (AC-1/AC-4) as real text.
-        expect(find.text('42.0 km'), findsOneWidget);
-      },
-    );
+      await tester.pump();
+      _drainAssetException(tester);
+      // The readout shows the live distance (AC-1/AC-4) as real text.
+      expect(find.text('42.0 km'), findsOneWidget);
+    });
 
     testWidgets('TC-002 idle_compactSceneParks_andShowsParkedReadout', (
       tester,
@@ -209,26 +210,25 @@ void main() {
       }
     });
 
-    testWidgets(
-      'TC-005 firstFrame_preState_isParked_neverAutoScrolls',
-      (tester) async {
-        final controller = MockWindowModeController();
-        addTearDown(controller.dispose);
-        final game = JourneyGame();
-        // No state pushed: the Bloc is at its pre-state initial default.
-        await _pump(tester, game: game, controller: controller);
+    testWidgets('TC-005 firstFrame_preState_isParked_neverAutoScrolls', (
+      tester,
+    ) async {
+      final controller = MockWindowModeController();
+      addTearDown(controller.dispose);
+      final game = JourneyGame();
+      // No state pushed: the Bloc is at its pre-state initial default.
+      await _pump(tester, game: game, controller: controller);
 
-        // The scene must not auto-scroll before a real active state arrives.
-        final offsets = _pumpGame(game, frames: 120);
-        for (final o in offsets) {
-          expect(o, closeTo(offsets.first, kEps));
-        }
-        expect(game.isStopped, isTrue);
+      // The scene must not auto-scroll before a real active state arrives.
+      final offsets = _pumpGame(game, frames: 120);
+      for (final o in offsets) {
+        expect(o, closeTo(offsets.first, kEps));
+      }
+      expect(game.isStopped, isTrue);
 
-        // Pre-state shows NO "Paused — idle" overlay (parked WITHOUT message).
-        expect(find.text(kPausedOverlayText), findsNothing);
-      },
-    );
+      // Pre-state shows NO "Paused — idle" overlay (parked WITHOUT message).
+      expect(find.text(kPausedOverlayText), findsNothing);
+    });
 
     testWidgets(
       'TC-021-RM reduceMotion_suppressesScroll_butStillConveysState',
