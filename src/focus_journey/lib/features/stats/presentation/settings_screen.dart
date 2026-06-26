@@ -9,9 +9,11 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../journey/domain/travel_mode.dart';
 import '../domain/app_settings.dart';
 import 'onboarding_screen.dart';
 import 'settings_cubit.dart';
+import 'vehicle_picker.dart';
 
 /// The settings screen.
 class SettingsScreen extends StatefulWidget {
@@ -54,6 +56,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       cubit.setIdleThreshold(Duration(minutes: minutes));
                     }
                   },
+                ),
+              ),
+              const Divider(),
+              const _SectionHeader('Vehicle'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Text(
+                  'Pick the vehicle you ride. Cosmetic only — it changes the '
+                  'look, never your distance.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: VehiclePicker(
+                  key: const Key('settings-vehicle-picker'),
+                  // AC-4/AC-12: pre-seed to the saved preference, falling back to
+                  // the engine display default (motorbike) when "no preference".
+                  selected:
+                      settings.vehiclePreference ?? TravelMode.motorbike,
+                  // AC-11: writes through the single SettingsCubit preference.
+                  onSelected: cubit.setVehicle,
                 ),
               ),
               const Divider(),

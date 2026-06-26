@@ -26,11 +26,23 @@ class JourneyCubit extends Cubit<JourneyViewState> {
   /// Creates the cubit in its pre-state parked default.
   JourneyCubit() : super(const JourneyViewState.initial());
 
-  /// Reads the engine's current `state`/`mode`/`distanceKm` and emits the
-  /// mapped view (TC-005/TC-021). Pure read — never writes to the engine.
+  /// Reads the engine's current `state`/`mode`/`distanceKm`/`idleTimeToday` and
+  /// emits the mapped view (TC-005/TC-021). Pure read — never writes to the
+  /// engine.
+  ///
+  /// idle-accounting AC-2: the emitted [JourneyViewState.idleTimeToday] is the
+  /// engine's `idleTimeToday` accumulator read VERBATIM — no independent
+  /// rounding/smoothing — so the displayed idle counter and the engine's
+  /// accounting agree with divergence 0 (Option B anchors both to the same
+  /// stamped value).
   void updateFromEngine(JourneyEngine engine) {
     emit(
-      JourneyViewState.fromEngine(engine.state, engine.mode, engine.distanceKm),
+      JourneyViewState.fromEngine(
+        engine.state,
+        engine.mode,
+        engine.distanceKm,
+        idleTimeToday: engine.idleTimeToday,
+      ),
     );
   }
 }

@@ -47,6 +47,8 @@ dependencies:
   flame: ^1.35.1
   launch_at_startup: ^0.5.1
   local_notifier: ^0.1.6
+  flutter_map: ^8.3.0
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:
@@ -79,7 +81,35 @@ flutter:
   # images.prefix (see JourneyAssets.assetPrefix).
   assets:
     - assets/journey/vehicles/
-    - assets/journey/objects/
+    # Vehicle-picker per-mode icons (vehicle-picker AC-14/AC-15). One distinct
+    # flat single-colour glyph per TravelMode (walk/run/bicycle/motorbike/car/
+    # ship) for the picker UI — NOT the in-scene side-view sprites under
+    # vehicles/. game-icons.net glyphs (CC BY 3.0; same family as the cockpit
+    # glyphs), recoloured to journey slate #2D3142, transparent bg. Every file
+    # attributed in assets/CREDITS.md.
+    - assets/journey/vehicle_icons/
+    # Richer scenery set (journey-scene-v2 #11; re-sourced wholesale by
+    # journey-scene-art-v3 #/AC-3). All CC0 / original-flat license-clean
+    # sprites; every file recorded in assets/CREDITS.md. Flutter asset directory
+    # entries are NON-recursive, so each scenery leaf dir is listed. (The v1
+    # `objects/` dir was retired in the art-v3 wholesale re-source — AC-3.)
+    - assets/journey/scenery/mountains/
+    - assets/journey/scenery/forest/
+    - assets/journey/scenery/countryside/
+    - assets/journey/scenery/city/
+    - assets/journey/scenery/sky/
+    # Beach/coast far band (journey-scene-art-v3 / AC-5; net-new).
+    - assets/journey/scenery/beach/
+    # Side-view full-body animals (journey-scene-art-v3 / AC-6; net-new pooled
+    # kinds in the spawn rotation).
+    - assets/journey/animals/
+    - assets/journey/people/
+    # First-person cockpit glyphs (journey-pov). Stylized-flat, license-clean
+    # CC BY 3.0 glyphs (Delapouite, game-icons.net) recoloured to the journey
+    # palette; every file recorded in assets/CREDITS.md (AC-17). NON-recursive
+    # asset dirs, so each leaf cockpit dir is listed.
+    - assets/journey/cockpit/car/
+    - assets/journey/cockpit/motorbike/
     # Tray / menu-bar icon variants (mini-window slice). Sourced by
     # ui-asset-curator via /source-assets (expected: tray_active.png,
     # tray_paused.png). Until present the tray degrades gracefully to a

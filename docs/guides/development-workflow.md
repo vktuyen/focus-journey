@@ -2,61 +2,74 @@
 
 A complete reference for how work moves from idea to shipped feature in this repo.
 
+> **Optimized in 2026-06.** The pipeline was trimmed to ship faster: acceptance criteria now live
+> **inline in `spec.md`** (no separate `acceptance-criteria.md` / `test-plan.md`); self-review is a
+> **pass built into `/implement`** (no separate command); status lives in **one place** (the Phase
+> ledger in `planning/active/<slug>.md`); there is **one roadmap** (`planning/roadmap.md`); and a
+> **small-change lane** (`/quick-change`) skips the ceremony for bug fixes and tiny tweaks.
+
 ---
 
-## Pipeline at a glance
+## Two lanes
+
+| Lane | When | Commands |
+|------|------|----------|
+| **Full feature loop** | A genuine feature; needs a spec, test design, maybe an ADR | `/capture-idea` → `/new-feature` → `/implement` → `/review-code` → `/execute-tests` → `/ship` |
+| **Small-change lane** | Bug fix / tiny tweak; statable in a few sentences + 1–4 ACs; no new ADR or dependency | `/quick-change <slug>` (does it all in one lean pass) |
+
+Pick the small-change lane unless the work genuinely needs the full treatment. `/quick-change` still
+enforces the two gates that matter — a review and a machine-verified green test run.
+
+---
+
+## Full-loop pipeline at a glance
 
 ```
  Idea
-  │ /capture-idea <slug>
+  │ /capture-idea <slug>   (optional — skip if already well-scoped)
   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  PHASE 1 · CAPTURE                                              │
-│  planning/backlog/<slug>.md                  status: queued     │
+│  PHASE 1 · CAPTURE        planning/backlog/<slug>.md             │
 │  domain framing · feasibility · success signals                 │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ /new-feature <slug>
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  PHASE 2 · SPEC                                                 │
-│  specs/<slug>/spec.md                  status: draft            │
-│  specs/<slug>/acceptance-criteria.md                            │
-│  specs/<slug>/test-plan.md                                      │
-│  tests/cases/<slug>.md                                          │
-│  planning/active/<slug>.md                                      │
+│  specs/<slug>/spec.md   (problem + scope + ACs inline)          │
+│  tests/cases/<slug>.md  (scenarios tagged to AC-IDs)            │
+│  planning/active/<slug>.md  (Phase ledger)                      │
 │                                        status: approved  ◄─ gate│
 └──────────────────────────┬──────────────────────────────────────┘
-                           │ /implement <slug>
+                           │ /implement <slug>   (incl. self-review pass)
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  PHASE 3 · BUILD                                                │
-│  src/  (production code)                                        │
-│  tests/unit/                                                    │
-│  tests/integration/ · tests/e2e/                                │
-│  planning/active/<slug>.md  ◄─ status log updated each step     │
+│  src/ (code) · src/test/ · src/integration_test/               │
+│  self-review pass (built in) → fix Blocking before handoff      │
+│  planning/active/<slug>.md  ◄─ Build row of the ledger ticked   │
 └──────────────────────────┬──────────────────────────────────────┘
-                           │ /review-code <slug>
+                           │ /review-code <slug>   (+ /privacy-audit)
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  PHASE 4 · REVIEW                                               │
-│  code-reviewer verdict: ready / changes requested / blocked     │
+│  PHASE 4 · REVIEW    flutter-code-reviewer verdict              │
+│                      ready / changes requested / blocked        │
 │                                             ready  ◄─ gate      │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ /execute-tests <slug>
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  PHASE 5 · TEST EXECUTION                                       │
-│  /execute-tests → test-executor runs the configured runner     │
-│  tests/_runner/reports/<slug>/<timestamp>/  (auto report)       │
-│  Manual smoke: tick each P0 AC in acceptance-criteria.md        │
-│  Verdict: green + all P0 ACs [x]    ◄─ gate                     │
+│  test-executor runs the configured runner                      │
+│  tests/_runner/reports/<slug>/<timestamp>/summary.md (verdict)  │
+│  tick each P0 AC in spec.md                                     │
+│  Verdict: green + P0 ACs [x]    ◄─ gate                         │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ /ship <slug>
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  PHASE 6 · SHIP                                                 │
-│  specs/<slug>/spec.md                  status: shipped          │
-│  planning/done/<slug>.md               (archived)               │
+│  PHASE 6 · SHIP    spec.md status: shipped                      │
+│  planning/done/<slug>.md (archived) · roadmap updated           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -66,30 +79,21 @@ A complete reference for how work moves from idea to shipped feature in this rep
 
 **Command:** `/capture-idea <slug>`
 
-**Goal:** Turn a fuzzy ask into a well-framed backlog item before it gets lost — without committing to a spec or to any canonical docs yet.
+**Goal:** Turn a fuzzy ask into a well-framed backlog item before committing to a spec or any canonical docs.
 
-The command scaffolds `planning/backlog/<slug>.md` from [planning/backlog/_template.md](../../planning/backlog/_template.md) and coordinates three agents to enrich it. Everything stays *contained in the backlog item* — agents only **flag** candidate domain terms, business rules, and ADRs; they do **not** write to `docs/domain/` or `docs/architecture/`.
+Scaffolds `planning/backlog/<slug>.md` and coordinates three agents to enrich it — `product-domain-expert`
+(Why + Domain notes, flags candidate glossary/business-rule updates), `system-architect` (Feasibility,
+`Size (rough)`, flags candidate ADRs), `test-case-designer` (2–4 Headline success signals). Everything stays
+*contained in the backlog item*; agents only **flag** candidates — they do not write to `docs/`.
 
-1. **`product-domain-expert`** — fills **Why** (problem / who / why now) and a **Domain notes** section (personas, edge cases, conflicts with existing business rules), flagging candidate glossary terms / business rules.
-2. **`system-architect`** — adds a **Feasibility (high-level)** section (fit with current architecture, key risks), sets the `Size (rough)` field, and flags candidate ADRs. (Gets the idea framing directly — it deliberately does not read `docs/domain/`.)
-3. **`test-case-designer`** — sketches 2–4 **Headline success signals**: observable, testable indicators of success, so the idea carries testable intent early.
+Large ideas fork into an **epic + child slices** (a Breakdown table + one light child item per slice, each
+promotable via `/new-feature`). This is how *wave discipline* becomes executable.
 
-| Artifact | Agent | Status field |
-|---|---|---|
-| `planning/backlog/<slug>.md` (or an epic + child slices) | `/capture-idea` (+ 3 agents) | `queued` (implicit — being in backlog means queued) |
+**Skip Phase 1** when the ask is already well-scoped (jump to `/new-feature`), or use `/quick-change` for a small fix.
 
-### Large ideas → epic + slices
+**Gate to Phase 2:** the idea answers "what problem, for whom?" → `/new-feature <slug>`.
 
-If the architect sizes the idea **L/XL** or the domain expert finds it spans several coherent features, `/capture-idea` forks: instead of one item it proposes a **breakdown** (slices, suggested wave order, `[blocked by: …]` dependencies) and — once you confirm — scaffolds:
-
-- an **epic** `planning/backlog/<epic>.md` with a **Breakdown** table linking each slice, and
-- one **child** `planning/backlog/<slice>.md` per slice (flat sibling slugs, no nesting), each tagged `Part of epic:` + its wave, and independently promotable via `/new-feature <slice>`.
-
-It also offers to seed [planning/roadmap.md](../../planning/roadmap.md) — Wave-1 slices under **Next**, later waves under **Later**. This is how *wave discipline* (deliver value wave-by-wave; don't start Wave N+1 until N ships) becomes executable rather than just a principle. Each slice then flows through Phases 2–6 on its own.
-
-**Gate to Phase 2:** The idea is specific enough to answer "what problem does this solve and for whom?" — then promote it with `/new-feature <slug>` (or, for an epic, promote its Wave-1 slice).
-
-> Phase 0 is intentionally commitment-free. Nothing under `docs/` or `src/` changes here. Candidate domain/architecture updates land as checklists inside the backlog item and are revisited when the idea is promoted.
+> Phase 1 is commitment-free. Nothing under `docs/` or `src/` changes.
 
 ---
 
@@ -97,29 +101,27 @@ It also offers to seed [planning/roadmap.md](../../planning/roadmap.md) — Wave
 
 **Command:** `/new-feature <slug>`
 
-This command scaffolds all spec artifacts and runs two agents in sequence:
+Copies `specs/_template/` → `specs/<slug>/` (just `spec.md` + `summary.html`) and runs two agents:
 
-1. **`product-domain-expert`** — reads [docs/domain/](../domain/) (business rules, glossary, personas) and drafts:
-   - `specs/<slug>/spec.md` — problem statement, user & outcome, scope (in/out), constraints, open questions
-   - `specs/<slug>/acceptance-criteria.md` — `[ ] AC-N: Given / When / Then` statements, plus non-functional requirements
+1. **`product-domain-expert`** — reads [docs/domain/](../domain/) and drafts `spec.md`: problem, user &
+   outcome, scope (in/out), constraints, and the **`## Acceptance criteria`** section inline
+   (`[ ] AC-N: Given/When/Then` + Non-functional). **ACs live in the spec — there is no separate
+   `acceptance-criteria.md`.**
+2. **`test-case-designer`** — writes `tests/cases/<slug>.md`: human-readable scenarios, each **tagged with
+   the AC-ID(s) it covers**, with a short **Coverage note** at the top (which layers cover which ACs; risks).
+   This replaces the old `test-plan.md`. It does not restate AC text.
 
-2. **`test-case-designer`** — reads the spec and ACs, then writes:
-   - `tests/cases/<slug>.md` — human-readable test scenarios (P0/P1/P2 × happy-path/edge/negative/regression)
-   - `specs/<slug>/test-plan.md` — coverage matrix (AC × Unit/Integration/E2E/Manual) and risk notes
-
-The command also creates `planning/active/<slug>.md` to track initiative progress.
+Also creates `planning/active/<slug>.md` with its **Phase ledger** (the single status tracker).
 
 | Artifact | Agent | Status field |
 |---|---|---|
-| `specs/<slug>/spec.md` | `product-domain-expert` | `draft` → `approved` |
-| `specs/<slug>/acceptance-criteria.md` | `product-domain-expert` | checkboxes `[ ]` |
-| `specs/<slug>/test-plan.md` | `test-case-designer` | coverage matrix |
-| `tests/cases/<slug>.md` | `test-case-designer` | P0/P1/P2 per case |
-| `planning/active/<slug>.md` | `/new-feature` | status log |
+| `specs/<slug>/spec.md` (incl. inline ACs) | `product-domain-expert` | `draft` → `approved` → `shipped`; AC checkboxes |
+| `tests/cases/<slug>.md` | `test-case-designer` | Coverage note + P0/P1/P2 per case |
+| `planning/active/<slug>.md` | `/new-feature` | Phase ledger |
 
-**Gate to Phase 3:** `spec.md` `status: approved`; every AC is testable and concrete; `tests/cases/<slug>.md` exists.
+**Gate to Phase 3:** `spec.md` `status: approved`; every AC is testable; `tests/cases/<slug>.md` exists.
 
-> Review the spec yourself and change `status: draft` → `status: approved` when you're satisfied. Agents won't proceed without it.
+> Review the spec yourself and set `status: draft` → `approved`. Agents won't proceed without it.
 
 ---
 
@@ -127,24 +129,24 @@ The command also creates `planning/active/<slug>.md` to track initiative progres
 
 **Command:** `/implement <slug>`
 
-Preconditions checked automatically: spec is approved, ACs exist, test cases exist.
+Preconditions checked automatically: spec approved (with inline ACs), test cases exist, project scaffolded.
 
-Three agents run in order:
+Agents are **named directly** (this is a Flutter project — no role-indirection):
 
-1. **`code-generator`** — reads the approved spec and ACs, writes production code under `src/`. Follows existing patterns in `docs/architecture/`.
-2. **`unit-test-writer`** — writes fast, isolated unit tests under `tests/unit/` mirroring the `src/` layout. One behavior per test. No network or filesystem unless the unit *is* that boundary.
-3. **`test-script-author`** — converts every case in `tests/cases/<slug>.md` into an executable script under `tests/integration/` or `tests/e2e/`. One case = one automated test; test names match case titles for full traceability.
+1. **`flutter-app-developer`** (UI/Bloc) writes production code under `src/`, pulling in
+   **`flutter-native-plugin-engineer`** (native idle/tray/window) or **`flame-game-developer`** (Flame scenes)
+   for those slices. Pure domain logic stays framework-free.
+2. **`unit-test-writer`** writes fast, isolated tests (mirroring `src/`, under `src/test/`).
+3. **`/source-assets`** (uses `ui-asset-curator`) gathers license-clean art if needed.
+4. **`test-script-author`** turns each case in `tests/cases/<slug>.md` into executable tests
+   (`src/test/` / `src/integration_test/`), one case = one test, names matching for traceability.
+5. **Self-review pass (built in).** `flutter-code-reviewer` reviews the diff adversarially and returns
+   **Blocking / Suggestion / Nit** findings; obvious Blocking fixes are applied before handoff. This is a fast
+   internal loop — it does not replace the Phase-4 `/review-code` gate. (There is no separate `/self-review` command.)
 
-After each agent finishes, the command appends a dated entry to `planning/active/<slug>.md`'s status log.
+After the work, the command ticks the **Build** row of the Phase ledger (date + note).
 
-| Artifact | Agent | Notes |
-|---|---|---|
-| `src/` | `code-generator` | Scope = spec ACs only |
-| `tests/unit/` | `unit-test-writer` | Mirrors `src/` layout |
-| `tests/integration/` or `tests/e2e/` | `test-script-author` | One test per case |
-| `planning/active/<slug>.md` | command | Updated after each step |
-
-**Gate to Phase 4:** All ACs have corresponding code; unit tests pass locally.
+**Gate to Phase 4:** all ACs have code; unit tests pass; self-review Blocking cleared.
 
 ---
 
@@ -152,31 +154,22 @@ After each agent finishes, the command appends a dated entry to `planning/active
 
 **Command:** `/review-code <slug>`
 
-**`code-reviewer`** performs a read-only audit against the spec, ACs, test cases, and repo patterns. It does not modify files.
+**`flutter-code-reviewer`** performs a read-only audit against the spec's ACs, the cases, and repo patterns,
+checking correctness per AC, test coverage, scope discipline, pattern/Clean-Arch/Bloc alignment, security,
+and test quality. **`/privacy-audit`** (`privacy-guardian`) runs alongside — the trust-promise gate.
 
-It checks:
-- Correctness against each AC
-- Test coverage (unit + integration + e2e)
-- Scope discipline (no speculative abstractions)
-- Pattern alignment with `docs/architecture/`
-- Security (OWASP top-10 surface)
-- Test quality (isolation, naming, traceability to cases)
-
-**Verdict:**
-- `ready` — proceed to Phase 5
-- `changes requested` — route findings back to the relevant agent
-- `blocked` — a fundamental issue must be resolved before continuing
-
-Findings are grouped by severity (P0 blocking / P1 important / P2 nice-to-have). Route each finding to the agent responsible:
+**Verdict:** `ready` (→ Phase 5) · `changes requested` (route findings back) · `blocked`. Route each finding:
 
 | Finding type | Route to |
 |---|---|
 | Business logic / AC misread | `product-domain-expert` |
-| Production code issue | `code-generator` |
+| Production code issue | `flutter-app-developer` (or the relevant specialist) |
 | Unit test gap | `unit-test-writer` |
 | E2E/integration test gap | `test-script-author` |
 
-**Gate to Phase 5:** Verdict = `ready`; no unresolved P0 or P1 findings.
+The command ticks the **Review** row of the Phase ledger (date + verdict + note).
+
+**Gate to Phase 5:** verdict = `ready`; no unresolved P0/P1 findings.
 
 ---
 
@@ -184,31 +177,21 @@ Findings are grouped by severity (P0 blocking / P1 important / P2 nice-to-have).
 
 **Command:** `/execute-tests <slug>`
 
-**`test-executor`** reads the cases in `tests/cases/<slug>.md`, finds the in-scope scripts under `tests/e2e/` and `tests/integration/`, resolves the runner choice from `docs/architecture/overview.md`, runs them using the configured runner with config under `tests/_runner/`, and writes a full run report to `tests/_runner/reports/<slug>/<timestamp>/`.
-
-The agent surfaces a summary: total / passed / failed / flaky / skipped, with each failing test mapped back to its case ID. Mechanical flakes (selector drift, timing, wait conditions) may be patched in place with a 1-line note in the report; functional failures are not fixed by this agent.
-
-**Verdict:**
-- `green` — proceed to manual AC walkthrough
-- `failures` — route each failure to the responsible agent (see below)
-- `blocked` — preconditions missing (no runner declared in `overview.md`, no runner config, no scripts, no cases)
+**`test-executor`** reads `tests/cases/<slug>.md`, finds the in-scope scripts (`src/test/`,
+`src/integration_test/`), resolves the runner from `docs/architecture/overview.md`, runs them, and writes a
+report to `tests/_runner/reports/<slug>/<timestamp>/` — including a machine-checkable `summary.md` with a
+`verdict:` field. Mechanical flakes may be patched in place; functional failures route back:
 
 | Failure type | Route to |
 |---|---|
-| Functional regression | `code-generator` |
+| Functional regression | `flutter-app-developer` |
 | Wrong / weak assertion | `test-script-author` |
 | Missing scenario | `test-case-designer` |
 
-After automation is `green`, perform a manual smoke test: walk through each P0 AC in `specs/<slug>/acceptance-criteria.md` and tick it (`[x]`).
+After `green`, walk each P0 AC in `spec.md`'s `## Acceptance criteria` and tick it `[x]`. The command then
+ticks the **Test** row of the Phase ledger (date + verdict + report path).
 
-Record a dated entry in `planning/active/<slug>.md`:
-```
-YYYY-MM-DD  /execute-tests: green (12/12). Report: tests/_runner/reports/<slug>/2026-05-10T1430/. AC-1..AC-5 manually verified. No blockers.
-```
-
-If blockers exist, log them explicitly and resolve before shipping.
-
-**Gate to Phase 6:** Verdict = `green`; all P0 ACs checked `[x]`; no open blockers in status log.
+**Gate to Phase 6:** verdict = `green`; all P0 ACs `[x]`.
 
 ---
 
@@ -216,16 +199,40 @@ If blockers exist, log them explicitly and resolve before shipping.
 
 **Command:** `/ship <slug>`
 
-The command:
-1. Confirms all ACs are checked and no P0/P1 test cases are unimplemented.
-2. **Verifies a green test execution report.** Reads the most recent `tests/_runner/reports/<slug>/<timestamp>/summary.md` and requires `verdict: green`. If the report is missing, stale, or shows `failures`/`blocked`, the command stops and reports — shipping is blocked until `/execute-tests <slug>` produces a fresh green run.
-3. Updates `specs/<slug>/spec.md` → `status: shipped` with today's date.
-4. Moves `planning/active/<slug>.md` → `planning/done/<slug>.md`, linking the report folder used as the green gate.
-5. Outputs a 3-bullet release summary (including report timestamp + pass count) for changelog / release notes.
+1. Confirms all ACs in `spec.md`'s `## Acceptance criteria` are checked (legacy slugs: a separate
+   `acceptance-criteria.md`), and no P0/P1 cases are unimplemented.
+2. **Verifies a green test report** — reads the latest `summary.md` and requires `verdict: green` (refuses
+   on missing / stale / `failures` / `blocked`). Machine-checked hard gate.
+3. Sets `spec.md` → `status: shipped` with today's date.
+4. Ticks the **Ship** row, then moves `planning/active/<slug>.md` → `planning/done/<slug>.md` with
+   "What shipped" + "What we'd do differently" notes and the green-report link.
+5. Updates `planning/roadmap.md` "Where I am right now" + "Immediate next action".
+6. Outputs a 3-bullet release summary.
 
-The initiative is now archived. The spec remains as a permanent record of what was built and why.
+> **Why the gate is machine-checked.** The green verdict lives in a structured `summary.md` (YAML `verdict:`),
+> not free text, so `/ship` can refuse a stale or red run.
 
-> **Why the gate is machine-checked.** Earlier the green verdict lived only in `/execute-tests` console output and a free-text status log line. That made it easy to ship after a stale or red run. The `test-executor` agent now writes a structured `summary.md` (with a YAML `verdict:` field) to each run folder, and `/ship` refuses to proceed unless the latest one is `green`.
+---
+
+## Status — single source of truth
+
+The **Phase ledger** in `planning/active/<slug>.md` is the *only* per-slug status record. Each phase command
+ticks its row in place (date + verdict + one-line note). There is **no separate status-log table** to keep in
+sync, and **no `execution-roadmap.md`** — `planning/roadmap.md` is the single human-facing tracker.
+
+**Start each session with `/status`** — it derives the current phase + next command from the ledger (falling
+back to spec status / AC checkboxes / latest report verdict).
+
+| What to check | Where to look | What to look for |
+|---|---|---|
+| In progress? | `planning/active/` | File exists |
+| Current phase / next step / blocker | `planning/active/<slug>.md` `## Phase ledger` | Last ticked row + Current phase / Next command |
+| Spec approved? | `specs/<slug>/spec.md` | `status: approved` |
+| Which ACs done? | `specs/<slug>/spec.md` `## Acceptance criteria` | `[x]` vs `[ ]` (legacy: `acceptance-criteria.md`) |
+| Test cases + coverage | `tests/cases/<slug>.md` | Coverage note + P0/P1/P2 list |
+| Last test run | `tests/_runner/reports/<slug>/` (latest) | `verdict:` in `summary.md` |
+| Shipped? | `planning/done/` | File exists AND `spec.md` status = `shipped` |
+| Roadmap / what next | `planning/roadmap.md` | "Where I am right now" + "Immediate next action" |
 
 ---
 
@@ -233,36 +240,14 @@ The initiative is now archived. The spec remains as a permanent record of what w
 
 | Artifact | Created by | Status values | Feeds into |
 |---|---|---|---|
-| `planning/backlog/<slug>.md` | `/capture-idea` (+ domain/architecture/test-design agents) | (queued) | Phase 2 |
-| `planning/backlog/<epic>.md` + child slices | `/capture-idea` (epic fork) | (queued) | Phase 2 (per slice, in wave order) |
-| `planning/active/<slug>.md` | `/new-feature` | status log entries | `/ship` |
-| `specs/<slug>/spec.md` | `product-domain-expert` | `draft` → `approved` → `shipped` | `code-generator` |
-| `specs/<slug>/acceptance-criteria.md` | `product-domain-expert` | `[ ]` / `[x]` checkboxes | `test-case-designer`, `code-reviewer` |
-| `specs/<slug>/test-plan.md` | `test-case-designer` | coverage matrix | `test-script-author` |
-| `tests/cases/<slug>.md` | `test-case-designer` | P0/P1/P2 + type per case | `test-script-author`, `code-reviewer` |
-| `src/` | `code-generator` | — | `unit-test-writer`, `code-reviewer` |
-| `tests/unit/` | `unit-test-writer` | pass / fail | `code-reviewer` |
-| `tests/e2e/` & `tests/integration/` | `test-script-author` | pass / fail | `code-reviewer`, `test-executor` |
-| `tests/_runner/reports/<slug>/<timestamp>/` | `test-executor` | green / failures / blocked | release notes / regression triage |
-| `tests/_runner/reports/<slug>/<timestamp>/summary.md` | `test-executor` | `verdict: green` ⇒ `/ship` gate passes | `/ship` (hard gate) |
+| `planning/backlog/<slug>.md` (or epic + slices) | `/capture-idea` | (queued) | Phase 2 |
+| `planning/active/<slug>.md` | `/new-feature` | Phase ledger (single tracker) | `/ship` |
+| `specs/<slug>/spec.md` (incl. inline ACs) | `product-domain-expert` | `draft`→`approved`→`shipped`; AC `[ ]`/`[x]` | `flutter-app-developer`, `flutter-code-reviewer` |
+| `tests/cases/<slug>.md` | `test-case-designer` | Coverage note + P0/P1/P2 per case | `test-script-author`, `flutter-code-reviewer` |
+| `src/` | `flutter-app-developer` (+ specialists) | — | `unit-test-writer`, `flutter-code-reviewer` |
+| `src/test/`, `src/integration_test/` | `unit-test-writer`, `test-script-author` | pass / fail | `flutter-code-reviewer`, `test-executor` |
+| `tests/_runner/reports/<slug>/<timestamp>/summary.md` | `test-executor` | `verdict: green` ⇒ `/ship` gate | `/ship` (hard gate) |
 | `planning/done/<slug>.md` | `/ship` | shipped (archived) | roadmap / release notes |
-
----
-
-## Status tracking cheat-sheet
-
-| What to check | Where to look | What to look for |
-|---|---|---|
-| Is this initiative in progress? | `planning/active/` | File exists |
-| What's the current blocker? | `planning/active/<slug>.md` | Latest status log entry |
-| Is the spec approved? | `specs/<slug>/spec.md` line 1 | `status: approved` |
-| Which ACs are done? | `specs/<slug>/acceptance-criteria.md` | `[x]` vs `[ ]` |
-| What test cases exist? | `tests/cases/<slug>.md` | P0/P1/P2 list |
-| Which tests are automated? | `tests/unit/`, `tests/e2e/`, `tests/integration/` | File names match case titles |
-| What's the test coverage plan? | `specs/<slug>/test-plan.md` | AC × layer matrix |
-| What did the review find? | Last `/review-code` output | Verdict + severity list |
-| What did the last test run say? | `tests/_runner/reports/<slug>/` (latest timestamp) | Verdict + per-test → case-ID mapping |
-| Is this shipped? | `planning/done/` | File exists AND `spec.md` status = `shipped` |
 
 ---
 
@@ -270,33 +255,28 @@ The initiative is now archived. The spec remains as a permanent record of what w
 
 | Command | When to run | What it does |
 |---|---|---|
-| `/capture-idea <slug>` | New idea, not yet scoped | Frames a backlog item (domain + feasibility + success signals) via 3 agents |
-| `/new-feature <slug>` | Idea is scoped | Scaffolds spec + ACs + test-plan + cases + active initiative |
-| `/implement <slug>` | Spec is `approved` | Code + unit tests + e2e/integration automation |
-| `/review-code <slug>` | Implementation complete | Read-only critique; surfaces findings by severity |
-| `/execute-tests <slug>` | Code review is `ready` | Runs the configured runner via `test-executor`; writes report under `tests/_runner/reports/` |
-| `/ship <slug>` | All P0 ACs green, no blockers | Marks shipped, archives initiative, outputs release summary |
+| `/quick-change <slug>` | Bug fix / tiny tweak | Lean lane: stub spec + ACs → implement+test+self-review → review → test → ship |
+| `/capture-idea <slug>` | New, fuzzy idea | Frames a backlog item (domain + feasibility + success signals) |
+| `/new-feature <slug>` | Idea is scoped | Scaffolds `spec.md` (with inline ACs) + test cases + active ledger |
+| `/implement <slug>` | Spec `approved` | Code + unit tests + automation + built-in self-review pass |
+| `/review-code <slug>` | Build complete | Read-only critique (+ `/privacy-audit`); findings by severity |
+| `/execute-tests <slug>` | Review `ready` | Runs the runner; writes `summary.md` with a `verdict:` |
+| `/ship <slug>` | Green report + P0 ACs `[x]` | Marks shipped, archives, updates roadmap, release summary |
 
 ---
 
 ## Domain knowledge
 
-[docs/domain/](../domain/) is the shared source of truth that feeds every spec:
-
-| File | Contains |
-|---|---|
-| `business-rules.md` | Numbered rules (BR-N) the product must enforce |
-| `glossary.md` | Canonical definitions for all domain terms |
-| `personas.md` | Who uses the product and what they need |
-
-`product-domain-expert` reads these files before drafting any spec. When business rules change — even mid-initiative — update `docs/domain/` first, then re-run the affected spec sections. Do not encode business rules only inside specs; they rot there.
+[docs/domain/](../domain/) feeds every spec: `business-rules.md` (BR-N), `glossary.md`, `personas.md`.
+`product-domain-expert` reads these before drafting any spec. When business rules change, update `docs/domain/`
+first, then re-run the affected spec sections — don't let rules rot inside specs.
 
 ---
 
 ## Guardrails (summary)
 
-- No code in `src/` before a spec is `approved`.
+- No code in `src/` before a spec is `approved` (or a `/quick-change` stub is confirmed).
 - No automated tests without a corresponding case in `tests/cases/`.
-- No speculative abstractions — scope = spec ACs only.
-- `code-reviewer` is read-only — it surfaces findings, it does not fix them.
-- Shipping requires manual AC verification AND a machine-verified green `summary.md` from the latest `/execute-tests` run. `/ship` enforces both.
+- No speculative abstractions — scope = the spec's ACs only.
+- Reviewers are **read-only** — they surface findings, they don't fix them.
+- Shipping requires manual P0-AC verification AND a machine-verified green `summary.md`. `/ship` enforces both.

@@ -26,8 +26,11 @@ Execution plan:
 4. Surface the agent's run summary verbatim, including the per-test → case-ID mapping and verdict (`green` / `failures` / `blocked`).
    - Confirm the agent wrote `tests/_runner/reports/$ARGUMENTS/<timestamp>/summary.md` with a `verdict:` field. If the file is missing, treat the run as incomplete and re-prompt the agent — `/ship` relies on this artifact as a hard gate.
 5. If the verdict is `failures`, suggest which downstream agent should address each finding:
-   - Functional regression → `code-generator`
+   - Functional regression → `flutter-app-developer` (or the relevant specialist)
    - Wrong/weak assertion or wrong scenario coverage → `test-script-author`
    - Missing case → `test-case-designer`
+6. After a `green` run, walk each P0 AC in `specs/$ARGUMENTS/spec.md`'s `## Acceptance criteria` section
+   and tick it `[x]`. Then update the **Test** row of the Phase ledger in `planning/active/$ARGUMENTS.md`
+   in place (date + verdict + report path) — single source of truth, no separate status log.
 
 Do NOT apply functional fixes from this command — execution and mechanical flake-patching only.

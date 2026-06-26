@@ -70,7 +70,7 @@ with the tray still updating (→ **TC-M3**). Record the spike verdict here; a F
       enabled per-OS.
 - [ ] Note the OS version tested (record below).
 
-OS versions under test — macOS: `__________`   Windows: `__________`
+OS versions under test — macOS: `macOS 25.5.0 (Darwin)` — re-verified 2026-06-24   Windows: `__________`
 
 ---
 
@@ -91,7 +91,13 @@ Expect: the frameless body **drags** the window (no title bar needed), and after
 at the **last dragged position** (size unchanged — fixed compact size). An off-screen drag near a screen
 edge that is then unplugged should clamp back on restore (cross-check the automated TC-019-CLAMP).
 
-- macOS: Pass [ ]  Fail [ ]  Blocked [ ]
+> NOTE (2026-06-24): the compact PiP now carries an **expand / restore control** (top-right
+> `Icons.open_in_full` button — "Back to full window") layered ABOVE the body drag region. On the real
+> macOS run, dragging the BODY (away from the top-right corner) still moves the frameless window
+> (verified: window moved by the exact drag delta), while a tap on the corner control restores full and
+> does NOT initiate a window-move. See TC-M3 for the verified expand-from-compact result.
+
+- macOS: Pass [x] (body drag moves frameless window, verified 2026-06-24)  Fail [ ]  Blocked [ ]
 - Windows (DEFERRED — required before any Windows release): Pass [ ]  Fail [ ]  Blocked [ ]
 
 ### TC-M2 — PiP stays above a DIFFERENT focused application (macOS spike-gate (b)) (P0, [REAL-OS])
@@ -145,8 +151,55 @@ Expect: close = hide-to-tray (process alive, tracking continues, PiP not auto-sh
 live state; all three menu actions perform their effect; **Quit** is the only full-exit path; on Quit the
 latest state is persisted (relaunch shows the accrued distance — cross-check TC-017).
 
-- macOS: Pass [ ]  Fail [ ]  Blocked [ ]
+> RE-VERIFIED 2026-06-24 (real macOS .app, real window+tray backend, mock activity) — three regressions
+> (two found by Kevin, plus the close→hide-to-tray one found during this run and approved for fix) were
+> fixed and re-tested end-to-end via synthetic HID events + keyboard menu navigation against the running
+> app:
+>
+> - **Menu-bar icon → menu opens AND item clicks fire (was BROKEN).** Root cause: the tray context menu was
+>   being rebuilt on EVERY journey tick (the live "X.X km" status line was a menu item). `tray_manager`'s
+>   `setContextMenu` regenerates fresh menu-item ids each call, while the natively-displayed menu kept its
+>   build-time ids, so the Dart click router (`Menu.getMenuItemById(id)`) could no longer resolve the
+>   clicked id and `onTrayMenuItemClick` silently no-op'd. FIX: the menu is now rebuilt ONLY on a structure
+>   change (`init` / `setMode`); the live distance readout moved to the tooltip. Verified the menu now
+>   builds exactly once at launch and item ids stay stable.
+> - **Show app** (from compact) → restores the FULL framed window (900x700). Verified: `onTrayMenuItemClick
+>   key=show_app` → action stream → `showApp()` → `exitFull()`; window observed at 900x700.
+> - **Enter compact / PiP** → window collapses to the fixed compact size. Verified: window observed at
+>   280x180; menu then correctly rebuilt with "Enter compact" disabled in compact mode.
+> - **NEW expand control in the compact PiP** (BUG-1): with no in-PiP control the user was stranded in
+>   compact. A top-right `Icons.open_in_full` button ("Back to full window") now restores full. Verified:
+>   a click on the corner control returned the window from 280x180 to 900x700; the body drag (center) still
+>   moved the frameless window, so the control is NOT swallowed by the drag region.
+> - **Quit** → process fully exits (verified: `key=quit` → `TrayAction.quit` → process gone) and is the
+>   only full-exit path.
+>
+> - **Close button → hide-to-tray, process stays alive, tracking continues (was a 3rd regression; now
+>   FIXED + verified).** On the real run the close (red traffic-light) button had been TERMINATING the
+>   process instead of hiding. Root cause was NOT the engine's merged platform/UI thread (that hypothesis
+>   was tested and DISPROVEN — disabling it changed nothing) and NOT the Dart intercept (instrumentation
+>   confirmed `setPreventClose(true)` set, `onWindowClose` fired, `isPreventClose()`==true, `hideToTray()`
+>   /`windowManager.hide()` ran). The cause was `AppDelegate.applicationShouldTerminateAfterLastWindowClosed`
+>   returning `true` in `macos/Runner/AppDelegate.swift`: once `hide()` left no visible window, macOS
+>   terminated the app. FIX: return `false` (a hide-to-tray app must survive its window being closed/hidden).
+>   Verified end-to-end with merged-thread mode at its DEFAULT (no Info.plist change needed):
+>   - Click close → window **hides** (windows count 0), **process stays ALIVE**, **tray icon remains** (PiP
+>     not auto-shown).
+>   - **Tracking keeps accruing while hidden** (mock active): the tray tooltip distance advanced
+>     3.4 → 4.1 → 4.4 km, then later 7.4 → 7.7 km, while the window was hidden.
+>   - **Tray "Show app"** restored the full window (900x700) from the hidden state.
+>   - **Tray "Quit"** (even from the hidden state) **fully exits** the process — still the only tray
+>     full-exit path. The standard macOS app-menu "Quit focus_journey" / Cmd-Q also still fully exits.
+>   - Re-confirmed (no regression from this change): tray Enter compact → 280x180; PiP expand control →
+>     900x700; the Flame scene renders/animates (distance kept incrementing) with no exceptions in the log.
+
+- macOS: Pass [x] (close→hide-to-tray + keeps-tracking; tray Show app / Enter compact / Quit; expand-from-compact — all verified 2026-06-24)  Fail [ ]  Blocked [ ]
 - Windows (DEFERRED — required before any Windows release): Pass [ ]  Fail [ ]  Blocked [ ]
+
+> PRE-EXISTING OBSERVATION (not introduced by this fix, flagged for awareness): the macOS app-menu "Quit" /
+> Cmd-Q calls `NSApp.terminate` directly and does NOT route through the slice's `WindowModeController.quit()`,
+> so the `onBeforeQuit` flush hook (AC-16) runs only on the **tray** Quit, not on Cmd-Q. This was true before
+> this change (Cmd-Q always bypassed the tray-Quit flush) and is unchanged by it.
 
 ### TC-M4 — Tray menu actions are keyboard / screen-reader reachable (NFR-6 real leg) (P1, [REAL-OS])
 Covers NFR-6 (tray-menu a11y real leg). Automated mock leg: TC-021 (readout-text-in-semantics half).

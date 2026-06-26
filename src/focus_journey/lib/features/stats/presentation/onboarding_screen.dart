@@ -6,9 +6,13 @@
 /// truthful: the app reads ONLY aggregate system idle time + lock/sleep state
 /// (via the already-audited `ActivityPlugin`, never called from this slice); it
 /// reads NONE of keystrokes/content, screen, clipboard, files, browser,
-/// mouse-position history, or window titles; it is fully local/offline with no
-/// account; notifications (`local_notifier`) and launch-at-startup
-/// (`launch_at_startup`) are local OS capabilities that add no such surface.
+/// mouse-position history, or window titles; everything about WHAT YOU DO stays
+/// on your machine with no account; notifications (`local_notifier`) and
+/// launch-at-startup (`launch_at_startup`) are local OS capabilities that add no
+/// such surface. THE ONE NETWORK EXCEPTION (map-experience): the map tab fetches
+/// anonymous OpenStreetMap map tiles to draw the real Vietnam map — those
+/// requests carry no personal data, no identifiers, and no activity/idle data,
+/// and the offline card below must say so truthfully.
 library;
 
 import 'package:flutter/material.dart';
@@ -111,13 +115,17 @@ class PrivacyContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'Fully local. Fully offline.',
+                  'Your activity stays local. No account, no tracking.',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'There is no account and no network. Nothing you do leaves '
-                  'your machine — no cloud sync, no servers, no tracking. '
+                  'There is no account, no cloud sync, no servers, and no '
+                  'analytics. Nothing about what you do — your focus and idle '
+                  'activity — ever leaves your machine. To draw the real '
+                  'Vietnam map, the app does fetch anonymous map tiles from '
+                  'OpenStreetMap; those requests carry no personal data, no '
+                  'identifiers, no activity or idle data, and no tracking. '
                   'Notifications are local desktop toasts only.',
                 ),
               ],

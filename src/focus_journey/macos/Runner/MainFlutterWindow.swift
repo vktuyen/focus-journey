@@ -13,6 +13,12 @@ class MainFlutterWindow: NSWindow {
     // Register the privacy-scoped activity channel (idle seconds + lock state).
     ActivityChannel.register(with: flutterViewController.engine.binaryMessenger)
 
+    // Register the per-surface window-visibility (occlusion) channel
+    // (journey-scene-v2 #5). Reads ONLY this window's own occlusion/minimized/
+    // hidden state — no other-app or input data (NFR-2).
+    WindowVisibilityChannel.register(
+      with: flutterViewController.engine.binaryMessenger, window: self)
+
     super.awakeFromNib()
   }
 }

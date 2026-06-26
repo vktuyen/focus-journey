@@ -32,13 +32,16 @@ class MockWindowModeController implements WindowModeController {
   final List<VisibleDisplay> _displays;
   final _modeController = StreamController<WindowMode>.broadcast();
   final _hiddenController = StreamController<void>.broadcast();
+  final _visibilityController = StreamController<bool>.broadcast();
 
   /// Ordered log of method names invoked — for test assertions.
   final List<String> calls = <String>[];
 
   WindowMode _mode = WindowMode.full;
 
-  /// Whether the window is currently visible (false after [hideToTray]).
+  /// Whether the window is currently visible (false after [hideToTray]). Tests
+  /// read this directly; the production-equivalent seam is [isWindowVisible] /
+  /// [windowVisibilityChanges] (NFR-1) — both reflect this same bool.
   bool visible = true;
 
   /// The current always-on-top flag.
@@ -63,12 +66,19 @@ class MockWindowModeController implements WindowModeController {
   Stream<WindowMode> get modeChanges => _modeController.stream;
 
   @override
+  bool get isWindowVisible => visible;
+
+  @override
+  Stream<bool> get windowVisibilityChanges => _visibilityController.stream;
+
+  @override
   Stream<void> get hiddenToTray => _hiddenController.stream;
 
   @override
   Future<void> setup() async {
     calls.add('setup');
     didSetup = true;
+    _setVisible(true); // initial show (de-duped — no-op if already visible).
   }
 
   @override
@@ -82,22 +92,24 @@ class MockWindowModeController implements WindowModeController {
       displays: _displays,
     );
     alwaysOnTop = true;
-    visible = true;
     _setMode(WindowMode.compact);
+    _setVisible(true);
   }
 
   @override
   Future<void> exitFull() async {
     calls.add('exitFull');
     alwaysOnTop = false;
-    visible = true;
     _setMode(WindowMode.full);
+    _setVisible(true);
   }
 
   @override
   Future<void> hideToTray() async {
     calls.add('hideToTray');
-    visible = false; // process stays alive; PiP not auto-shown (AC-18).
+    // process stays alive; PiP not auto-shown (AC-18). ONE source of truth for
+    // the NFR-1 pause: emit visibility=false via the same seam as production.
+    _setVisible(false);
     if (!_hiddenController.isClosed) {
       _hiddenController.add(null); // surface for the AC-17 one-time hint.
     }
@@ -110,7 +122,7 @@ class MockWindowModeController implements WindowModeController {
       await exitFull();
       return;
     }
-    visible = true;
+    _setVisible(true);
   }
 
   @override
@@ -146,6 +158,7 @@ class MockWindowModeController implements WindowModeController {
   Future<void> dispose() async {
     await _modeController.close();
     await _hiddenController.close();
+    await _visibilityController.close();
   }
 
   void _setMode(WindowMode next) {
@@ -153,6 +166,17 @@ class MockWindowModeController implements WindowModeController {
     _mode = next;
     if (!_modeController.isClosed) {
       _modeController.add(next);
+    }
+  }
+
+  /// De-duplicated visibility emission — mirrors the production backend so tests
+  /// assert against the same seam (NFR-1). Never emits identical consecutive
+  /// values.
+  void _setVisible(bool next) {
+    if (visible == next) return;
+    visible = next;
+    if (!_visibilityController.isClosed) {
+      _visibilityController.add(next);
     }
   }
 }

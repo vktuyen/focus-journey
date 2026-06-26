@@ -17,7 +17,7 @@ You are the test execution specialist.
 - `tests/integration/` — component-level scripts (authored by `test-script-author`)
 - `tests/_runner/` — runner configuration, fixtures, helpers for whichever runner the project uses
 - `docs/architecture/overview.md` — declares the chosen runner(s) and the invocation command(s) for each layer
-- `specs/<feature>/spec.md`, `specs/<feature>/acceptance-criteria.md` — for AC mapping
+- `specs/<feature>/spec.md` — incl. its inline `## Acceptance criteria` section — for AC mapping
 
 ## Where to write
 - `tests/_runner/reports/<feature>/<timestamp>/` — run summary, traces, screenshots, etc. (format depends on the runner)

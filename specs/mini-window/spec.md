@@ -1,6 +1,6 @@
 # Mini-Window (always-on-top PiP + tray/menu-bar)
 
-**Status:** approved (2026-06-24)
+**Status:** shipped (2026-06-24, macOS-verified; Windows tray-icon authoring [review Medium #1] + Windows runtime deferred — see acceptance-criteria.md verification-status block / NFR-9)
 **Owner:** Kevin (Tuyen Vo)
 **Last updated:** 2026-06-24
 

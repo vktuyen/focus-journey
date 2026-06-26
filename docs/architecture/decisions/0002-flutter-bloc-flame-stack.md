@@ -21,6 +21,9 @@ Build Vietnam Focus Journey as a cross-platform Flutter desktop app (macOS + Win
 - **v1 stack scope:** `flame` + `flutter_bloc` + `shared_preferences` (with `window_manager` / `tray_manager` reserved for the v2 mini-window).
 - **Deferred to v2:** `rive` (character polish), `flutter_map` + `latlong2` (geographic map), `drift`/SQLite (session history).
 
+> The `flutter_map` + `latlong2` deferral above is **superseded by ADR-0004** — `map-experience` activates that
+> dependency (the product's first network egress, anonymous OSM tile GETs). `rive` and `drift`/SQLite remain deferred.
+
 ## Consequences
 
 - **Easier:** shared UI + business logic across macOS and Windows; testable Blocs; Flame handles the custom POV animation.

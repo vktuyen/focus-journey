@@ -16,6 +16,7 @@ library;
 
 import 'dart:async';
 
+import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../domain/window_mode.dart';
@@ -23,7 +24,10 @@ import '../domain/window_mode_controller.dart';
 
 /// The immutable shell state: the current window [mode] and whether the
 /// one-time hide-to-tray hint should currently be shown (AC-17).
-class AppShellState {
+///
+/// Uses [Equatable] for value equality (matching the repo's other Bloc states)
+/// so a `BlocBuilder` never rebuilds on an identical state.
+class AppShellState extends Equatable {
   /// Creates a shell state.
   const AppShellState({required this.mode, this.showHideToTrayHint = false});
 
@@ -41,6 +45,9 @@ class AppShellState {
       showHideToTrayHint: showHideToTrayHint ?? this.showHideToTrayHint,
     );
   }
+
+  @override
+  List<Object?> get props => <Object?>[mode, showHideToTrayHint];
 }
 
 /// Owns the window mode and the first-run hide-to-tray hint. Pure presentation

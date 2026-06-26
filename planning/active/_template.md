@@ -7,25 +7,20 @@
 ## Goal
 <Single sentence. What "done" looks like.>
 
-## Plan
-- [ ] Step 1
-- [ ] Step 2
-- [ ] Step 3
-
 ## Phase ledger
-Update after each phase so a fresh session (`/status`) can resume. "Next" = the command to run next.
-- [ ] Phase 2 · Spec — `/new-feature` → review & approve `spec.md`
-- [ ] Phase 3 · Build — `/implement`
-- [ ] Phase 4 · Review — `/review-code`  (verdict: )
-- [ ] Phase 5 · Test — `/execute-tests`  (verdict: )
-- [ ] Phase 6 · Ship — `/ship`
+The **single** status tracker — one row per phase, updated in place after each phase command.
+Each row carries the date + a one-line note + verdict, so a fresh session (`/status`) can resume
+from this table alone. Do not keep a separate status log; the ledger IS the log.
+
+| ✓ | Phase | Command | Date | Verdict / note |
+|---|-------|---------|------|----------------|
+| [ ] | 2 · Spec | `/new-feature` → review & approve `spec.md` |  |  |
+| [ ] | 3 · Build | `/implement` (includes self-review pass) |  |  |
+| [ ] | 4 · Review | `/review-code` |  | verdict: |
+| [ ] | 5 · Test | `/execute-tests` |  | verdict: |
+| [ ] | 6 · Ship | `/ship` |  |  |
 
 **Current phase:** <n>   **Next command:** `/…`
-
-## Status log
-| Date | Note |
-|------|------|
-|      |      |
 
 ## Decisions made along the way
 <Link to ADRs or inline notes. Don't let decisions evaporate.>

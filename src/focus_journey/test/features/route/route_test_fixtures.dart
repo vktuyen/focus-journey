@@ -10,6 +10,7 @@
 import 'package:focus_journey/features/route/domain/journey_direction.dart';
 import 'package:focus_journey/features/route/domain/province.dart';
 import 'package:focus_journey/features/route/domain/province_chain.dart';
+import 'package:focus_journey/features/route/domain/route_plan.dart';
 import 'package:focus_journey/features/route/domain/route_repository.dart';
 import 'package:focus_journey/features/route/domain/route_selection.dart';
 
@@ -52,15 +53,24 @@ RouteSelection selection(
 /// selection (TC-012 / TC-014 / TC-017). Also serves the restart cases (TC-009 /
 /// TC-010) by replaying its last saved selection on [load].
 class RecordingRouteRepository implements RouteRepository {
-  RecordingRouteRepository({RouteSelection? seed}) : _stored = seed;
+  RecordingRouteRepository({RouteSelection? seed, RoutePlan? seedPlan})
+    : _stored = seed,
+      _storedPlan = seedPlan;
 
   RouteSelection? _stored;
+  RoutePlan? _storedPlan;
 
   /// Every selection passed to [save], in order — the write log.
   final List<RouteSelection> saves = <RouteSelection>[];
 
+  /// Every plan passed to [savePlan], in order — the route-planner-v2 write log.
+  final List<RoutePlan> planSaves = <RoutePlan>[];
+
   /// Number of recorded [save] calls.
   int get saveCount => saves.length;
+
+  /// Number of recorded [savePlan] calls.
+  int get planSaveCount => planSaves.length;
 
   @override
   Future<RouteSelection?> load() async => _stored;
@@ -69,5 +79,14 @@ class RecordingRouteRepository implements RouteRepository {
   Future<void> save(RouteSelection selection) async {
     saves.add(selection);
     _stored = selection;
+  }
+
+  @override
+  Future<RoutePlan?> loadPlan() async => _storedPlan;
+
+  @override
+  Future<void> savePlan(RoutePlan plan) async {
+    planSaves.add(plan);
+    _storedPlan = plan;
   }
 }

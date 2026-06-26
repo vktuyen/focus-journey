@@ -4,6 +4,7 @@
 library;
 
 import '../../activity/domain/activity_plugin.dart';
+import 'activity_segment.dart';
 import 'clock.dart';
 import 'journey_progress.dart';
 import 'journey_repository.dart';
@@ -55,6 +56,41 @@ import 'travel_mode.dart';
 ///   the injected clock's local date to the stored `currentDay`. On a new day the
 ///   three daily counters reset to zero; cumulative `distanceKm` is preserved
 ///   (TC-016).
+///
+/// ## idle-accounting (Option B + activity segments)
+///
+/// This slice layers two additions onto the rules above **without changing the
+/// resolved whole-tick classification or the `rawActiveTime`-during-grace rule**
+/// (idle-accounting Decisions (a)/(b)):
+///
+/// - **Option B — whole-tick + state-change timestamp.** Whole-tick accounting
+///   is unchanged and is the **sole** source of truth for the daily counters.
+///   Accounting always reads [idleTimeToday]; the UI also reads that same value,
+///   so the two can never diverge (AC-2 divergence 0). Additionally the engine
+///   stamps the instant the *displayed* `state` flips **Active→Idle/Paused**
+///   ([idleSince]) — a display/forward-contract anchor only. [idleSince] does
+///   **not** drive accounting and never feeds back into the counters; it exists
+///   so a later reader can render "idle from that moment" consistently with
+///   [idleTimeToday]. (Decision (b).)
+/// - **Idle onset (Decision (d)).** Voluntary idle onset = the band crossing
+///   `s > G`. Lock/sleep onset = the lock/sleep **instant** (immediate, overrides
+///   grace). Grace already credited as travel is **never** retro-converted to
+///   idle (grace-stays-travel preserved).
+/// - **Activity segments (Decision (c)).** An ordered, contiguous, gap-free list
+///   of [ActivitySegment]s keyed by **distance-along-route**, recording each
+///   span's classification (active/idle) and cause (voluntary / lockSleep). The
+///   list is **growth-bounded** by merging consecutive same-classification,
+///   same-cause ticks into the open segment, **split at the local-midnight
+///   rollover** so each day's idle stays correct **to within one tick** (the
+///   crossing tick is not sub-split at the true 00:00 instant — its whole delta
+///   lands in day N+1; see [_rolloverIfNewDay]), and **persisted** via the
+///   repository seam ([toProgress]/[restore]). It is the contract for the #7
+///   `map-experience` red overlay.
+///
+/// **Honesty invariant (hard, AC-1/AC-2).** Segment recording and the idle stamp
+/// are bookkeeping only — they never change `distanceKm`/`activeTimeToday`/
+/// `rawActiveTime`. Active/journey time is never over-credited; the ≤ one-tick
+/// residue Option B accepts always favours idle.
 class JourneyEngine {
   /// Creates the engine with injected dependencies and config.
   ///
@@ -156,6 +192,23 @@ class JourneyEngine {
   JourneyState _state = JourneyState.paused;
   late DateTime _currentDay;
 
+  /// The ordered activity-segment record (idle-accounting Decision (c)). The
+  /// last element is the *open* segment that the current tick extends; a
+  /// classification/cause change appends a new open segment.
+  final List<ActivitySegment> _segments = <ActivitySegment>[];
+
+  /// Option B state-change stamp: the clock instant the displayed `state` last
+  /// flipped **Active→Idle/Paused** (`null` while travelling or before any idle
+  /// onset). This is the display / forward-contract anchor consumed later by the
+  /// #7 map-experience reader (AC-2 / Decision (b)/(d)); it does **not** drive
+  /// accounting — the counters read [idleTimeToday]. Bookkeeping only: it never
+  /// alters `_distanceKm`/`_activeTimeToday`/`_rawActiveTime`, and is never an
+  /// independent accumulator that could diverge. Stamped at the *onset* instant
+  /// (start of the triggering tick) so `_clock.now() - _idleSince` tracks the
+  /// idle stretch's accrued wall-time. Not persisted (see S-3 note in
+  /// [_recordIdleTick]).
+  DateTime? _idleSince;
+
   /// The cosmetic travel skin. Settable; does not affect accrual in v1 (AC-13).
   TravelMode mode;
 
@@ -178,6 +231,21 @@ class JourneyEngine {
   /// The local calendar date (date-only) the daily counters belong to.
   DateTime get currentDay => _currentDay;
 
+  /// The ordered activity-segment record for today (idle-accounting Decision
+  /// (c)). Read-only snapshot — contiguous, gap-free, distance-keyed, merged,
+  /// day-split. The contract consumed by `map-experience` (#7). Returns an
+  /// unmodifiable view so callers can't corrupt the engine's record.
+  List<ActivitySegment> get segments =>
+      List<ActivitySegment>.unmodifiable(_segments);
+
+  /// Option B: the clock instant the displayed state last flipped
+  /// **Active→Idle/Paused**, or `null` while travelling (or before any idle
+  /// onset). This is the display / forward-contract anchor (consumed later by
+  /// #7 map-experience) so a reader can render "idle for …" consistently with
+  /// [idleTimeToday] (AC-2 / Decision (b)/(d)). It does **not** drive accounting —
+  /// the counters read [idleTimeToday]; this is the honest onset anchor only.
+  DateTime? get idleSince => _idleSince;
+
   // --- Core loop ----------------------------------------------------------
 
   /// Advances the engine by [delta] (real elapsed since the last tick, supplied
@@ -198,8 +266,15 @@ class JourneyEngine {
     required int idleSeconds,
     required bool screenLocked,
   }) {
+    // The day-boundary check runs first (even for a non-positive delta) so a
+    // restored/long-gap tick still rolls the day. The rollover SPLITS the open
+    // segment at midnight (Decision (c) / TC-117) before this tick accrues.
     _rolloverIfNewDay(_clock.now());
 
+    // NFR-2 / TC-113: a non-positive delta (clock step-back / NTP skew) is
+    // clamped to zero — no accrual, no state change, AND no segment is opened,
+    // closed, or shifted. The guard returns BEFORE any segment mutation so the
+    // record is byte-identical before and after.
     if (delta <= Duration.zero) {
       return;
     }
@@ -216,6 +291,13 @@ class JourneyEngine {
     if (screenLocked || sleepInferred || idle > threshold) {
       _idleTimeToday += delta;
       _state = JourneyState.paused;
+      // Cause = lockSleep ONLY when lock/sleep is the reason (it overrides grace
+      // and any voluntary ramp). A plain over-threshold idle with no lock/sleep
+      // is still a voluntary ramp (Decision (d)).
+      final cause = (screenLocked || sleepInferred)
+          ? SegmentCause.lockSleep
+          : SegmentCause.voluntary;
+      _recordIdleTick(delta, cause);
       return;
     }
 
@@ -223,6 +305,9 @@ class JourneyEngine {
     if (idle > grace) {
       _idleTimeToday += delta;
       _state = JourneyState.idle;
+      // Reaching the idle band via rising idle-seconds (no lock/sleep) is the
+      // voluntary ramp — onset is this `s > G` band crossing (Decision (d)).
+      _recordIdleTick(delta, SegmentCause.voluntary);
       return;
     }
 
@@ -240,7 +325,125 @@ class JourneyEngine {
       _rawActiveTime += credited;
     }
     _state = JourneyState.active;
+    // Travelling clears the idle anchor; grace counts as active/travel for the
+    // segment record (grace-stays-travel). The segment span uses the *credited*
+    // delta so its duration matches the accrued journey time (a clamped over-
+    // sized tick records the clamped span, not the raw delta).
+    _idleSince = null;
+    _recordActiveTick(credited);
   }
+
+  // --- Activity-segment recording (idle-accounting Decision (c)) -----------
+
+  /// Records an **active/travel** span of [credited] wall-time ending at the
+  /// current cumulative [distanceKm]. Merges into the open segment when it is
+  /// already active; otherwise appends a new active segment whose `fromKm` is
+  /// the distance at the span's start (so segments are contiguous and
+  /// gap-free).
+  void _recordActiveTick(Duration credited) {
+    _appendOrExtend(
+      newToKm: _distanceKm,
+      extraElapsed: credited,
+      classification: SegmentClassification.active,
+      cause: SegmentCause.none,
+    );
+  }
+
+  /// Records an **idle** span of [delta] wall-time. Idle accrues no distance, so
+  /// the span's `from`/`to` are both the current [distanceKm]. Sets/keeps the
+  /// Option B idle stamp ([_idleSince]) at the *onset* instant — the moment the
+  /// state first flipped to idle/paused (the `s > G` crossing for voluntary, the
+  /// lock/sleep instant for forced) — not on every subsequent idle tick.
+  ///
+  /// The onset instant is the **start** of this triggering tick, i.e.
+  /// `_clock.now().subtract(delta)`: the caller advanced the clock by [delta] *before*
+  /// calling [tick], so `_clock.now()` is the END of the tick; subtracting
+  /// [delta] recovers the instant the state actually flipped. Stamping the end
+  /// would over-state idle onset by one tick. This keeps `idleSince` consistent
+  /// with [idleTimeToday]: for one continuous idle stretch, at every tick
+  /// boundary `_clock.now() - _idleSince` equals the idle wall-time accrued in
+  /// that stretch (each subsequent idle tick adds the same `delta` to both
+  /// `_clock.now()` and `idleTimeToday`, leaving the difference invariant).
+  ///
+  /// Both onset causes anchor here at the start of their triggering tick: the
+  /// voluntary `s > G` band crossing and the lock/sleep detection tick. Lock and
+  /// sleep are detected on the same tick they occur (overriding grace), so their
+  /// onset is likewise the start of that tick.
+  void _recordIdleTick(Duration delta, SegmentCause cause) {
+    // NOTE (S-3, known limitation): _idleSince is in-memory only — not part of
+    // JourneyProgress — so an app killed while idle and restored the same day
+    // loses the onset anchor (restore() clears it). Acceptable for now because
+    // idleSince has no consumer yet; persistence is tracked against the #7
+    // map-experience slice, which is the first reader of this anchor.
+    _idleSince ??= _clock.now().subtract(delta);
+    _appendOrExtend(
+      newToKm: _distanceKm,
+      extraElapsed: delta,
+      classification: SegmentClassification.idle,
+      cause: cause,
+    );
+  }
+
+  /// Extends the open segment when it has the same classification AND cause
+  /// (growth bound — Decision (c) / TC-118); otherwise appends a new segment
+  /// whose `fromKm` is the previous segment's `toKm` (contiguity — `seg[i].to ==
+  /// seg[i+1].from`, AC-3 / TC-107). The very first segment starts at the run's
+  /// distance at the span's start. A pending day boundary (set by
+  /// [_rolloverIfNewDay]) forces a NEW segment even for an identical
+  /// classification, so the open segment is split at midnight (TC-117).
+  void _appendOrExtend({
+    required double newToKm,
+    required Duration extraElapsed,
+    required SegmentClassification classification,
+    required SegmentCause cause,
+  }) {
+    final splitForDay = _dayBoundaryPending;
+    _dayBoundaryPending = false;
+
+    if (_segments.isNotEmpty && !splitForDay) {
+      final open = _segments.last;
+      if (open.classification == classification && open.cause == cause) {
+        _segments[_segments.length - 1] = open.extendedTo(
+          newToKm,
+          extraElapsed,
+        );
+        return;
+      }
+    }
+    // First-ever segment anchors at (current distance − distance this span just
+    // covered); every later segment (including a post-midnight split) anchors at
+    // the previous segment's `toKm` so the record stays contiguous and gap-free.
+    final fromKm = _segments.isEmpty
+        ? newToKm - _kmOver(extraElapsed, classification)
+        : _segments.last.toKm;
+    _segments.add(
+      ActivitySegment(
+        fromKm: fromKm,
+        toKm: newToKm,
+        elapsed: extraElapsed,
+        classification: classification,
+        cause: cause,
+      ),
+    );
+  }
+
+  /// The distance covered by [elapsed] of an [active] span (0 for idle). Used
+  /// only to anchor the *first* segment's `fromKm` at the run start; every
+  /// later segment anchors to the previous segment's `toKm`.
+  double _kmOver(Duration elapsed, SegmentClassification classification) {
+    if (classification != SegmentClassification.active) {
+      return 0;
+    }
+    return kmPerActiveHour *
+        elapsed.inMicroseconds /
+        Duration.microsecondsPerHour;
+  }
+
+  /// Set by [_rolloverIfNewDay] when a local-midnight crossing was just detected
+  /// and there is an open segment; the next [_appendOrExtend] then forces a new
+  /// segment (no cross-midnight merge) so the open span is **split** at the
+  /// boundary and each day's record stays separable (Decision (c) / TC-117).
+  bool _dayBoundaryPending = false;
 
   /// Convenience for the app-layer ticker: reads the snapshot from the injected
   /// [ActivityPlugin] and forwards to [tick]. Kept thin and async so the engine
@@ -263,6 +466,7 @@ class JourneyEngine {
     state: _state,
     mode: mode,
     storedDate: _currentDay,
+    segments: List<ActivitySegment>.unmodifiable(_segments),
   );
 
   /// Persists the current snapshot via the injected [repository] (AC-11).
@@ -281,17 +485,29 @@ class JourneyEngine {
     _distanceKm = progress.distanceKm;
     mode = progress.mode;
     _currentDay = today;
+    _dayBoundaryPending = false;
+    _idleSince = null;
 
+    _segments.clear();
     if (progress.storedDate.isBefore(today)) {
+      // Stored date earlier than today → a new day: reset the daily counters
+      // and DROP the previous day's segment record (each day's segments belong
+      // to that day; TC-117 keeps a mid-run split, this is the closed-across-
+      // midnight case). distanceKm is preserved above.
       _activeTimeToday = Duration.zero;
       _rawActiveTime = Duration.zero;
       _idleTimeToday = Duration.zero;
       _state = JourneyState.paused;
     } else {
+      // Same local day (or a future stored date from clock skew, treated as
+      // today — TC-020/TC-115): restore the daily counters AND the segment
+      // record intact, so a restart resumes contiguously (TC-119) and clock
+      // skew never corrupts the segments (NFR-2 / TC-115).
       _activeTimeToday = progress.activeTimeToday;
       _rawActiveTime = progress.rawActiveTime;
       _idleTimeToday = progress.idleTimeToday;
       _state = progress.state;
+      _segments.addAll(progress.segments);
     }
   }
 
@@ -308,6 +524,19 @@ class JourneyEngine {
 
   /// Resets the daily counters once when [now]'s local date is past
   /// [_currentDay]; preserves `distanceKm` (AC-9). Idempotent within a day.
+  ///
+  /// idle-accounting (Decision (c) / TC-117): on a crossing it also (1) flags a
+  /// pending segment split so the open span is closed at the boundary and the
+  /// next tick opens a fresh day-N+1 segment (contiguous, no cross-midnight
+  /// merge), and (2) clears the Option B idle stamp so a new day's idle is
+  /// anchored to its own onset, not the previous day's.
+  ///
+  /// S-1 (limitation): the split is at *tick granularity*, not at the true 00:00
+  /// instant. A tick that straddles midnight is NOT sub-split — its entire delta
+  /// is accrued into the new day (day N+1) at the next [tick], so the previous
+  /// day's `idleTimeToday` is correct only **to within one tick** of the exact
+  /// midnight boundary. Sub-splitting the straddling tick is deliberately not
+  /// done here (non-trivial; not required by the ACs).
   void _rolloverIfNewDay(DateTime now) {
     final today = _dateOf(now);
     if (today.isAfter(_currentDay)) {
@@ -315,6 +544,8 @@ class JourneyEngine {
       _rawActiveTime = Duration.zero;
       _idleTimeToday = Duration.zero;
       _currentDay = today;
+      _dayBoundaryPending = _segments.isNotEmpty;
+      _idleSince = null;
     }
   }
 

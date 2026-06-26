@@ -50,11 +50,15 @@ import 'features/mini_window/domain/window_mode_controller.dart';
 import 'features/mini_window/presentation/app_shell.dart';
 import 'features/mini_window/presentation/app_shell_cubit.dart';
 import 'features/mini_window/presentation/journey_tray_mapper.dart';
+import 'features/window_visibility/data/window_visibility_factory.dart';
+import 'features/window_visibility/domain/window_visibility_controller.dart';
 import 'features/route/data/shared_preferences_route_repository.dart';
 import 'features/route/domain/province_chain.dart';
+import 'features/route/domain/province_geography.dart';
+import 'features/route/domain/route_plan.dart';
 import 'features/route/domain/route_repository.dart';
-import 'features/route/domain/route_selection.dart';
-import 'features/route/presentation/route_map_screen.dart';
+import 'features/route/presentation/map_cubit.dart';
+import 'features/route/presentation/map_surface.dart';
 import 'features/route/presentation/route_progress_cubit.dart';
 import 'features/route/presentation/route_view_state.dart';
 import 'features/stats/data/launch_at_startup_controller.dart';
@@ -89,8 +93,13 @@ Future<void> main() async {
   final routeRepository = SharedPreferencesRouteRepository(
     prefs,
     vietnamProvinceChain,
+    vietnamProvinceGeography,
   );
-  final savedSelection = await routeRepository.load();
+  // route-planner-v2 (ADR-0005 / AC-12): restore the authored RoutePlan via the
+  // existing seam. A legacy v1 RouteSelection blob is migrated forward to a plan
+  // (full start→tip sub-path) by loadPlan, so an in-flight v1 route survives the
+  // upgrade. An only-active (or restored-completed) plan seeds the route cubit.
+  final savedPlan = await routeRepository.loadPlan();
 
   final settingsRepository = SharedPreferencesSettingsRepository(prefs);
   final historyRepository = SharedPreferencesHistoryRepository(prefs);
@@ -105,6 +114,12 @@ Future<void> main() async {
   await window.setup();
   final tray = MiniWindowFactory.createTrayController();
   await tray.init();
+  // journey-scene-v2 #5: the per-surface OS occlusion seam. start() begins
+  // observing the app's OWN window visibility (no other-app/input data). The
+  // shell pauses the shared scene only when the shown surface is not visible
+  // and keeps animating when it is visible-but-unfocused (AC-3/AC-4/AC-5).
+  final windowVisibility = WindowVisibilityFactory.create();
+  await windowVisibility.start();
   final hideToTrayHintRepository =
       MiniWindowFactory.createHideToTrayHintRepository(prefs);
   final hintAlreadyShown = await hideToTrayHintRepository.hasShownHint();
@@ -112,12 +127,13 @@ Future<void> main() async {
   runApp(
     FocusJourneyApp(
       routeRepository: routeRepository,
-      savedSelection: savedSelection,
+      savedPlan: savedPlan,
       settingsRepository: settingsRepository,
       historyRepository: historyRepository,
       earnedBadgesRepository: earnedBadgesRepository,
       savedSettings: savedSettings,
       windowController: window,
+      windowVisibility: windowVisibility,
       trayController: tray,
       hideToTrayHintRepository: hideToTrayHintRepository,
       hintAlreadyShown: hintAlreadyShown,
@@ -135,9 +151,10 @@ class FocusJourneyApp extends StatefulWidget {
     required this.historyRepository,
     required this.earnedBadgesRepository,
     required this.windowController,
+    required this.windowVisibility,
     required this.trayController,
     required this.hideToTrayHintRepository,
-    this.savedSelection,
+    this.savedPlan,
     this.savedSettings,
     this.hintAlreadyShown = false,
     super.key,
@@ -158,14 +175,20 @@ class FocusJourneyApp extends StatefulWidget {
   /// The single-window controller seam (full ⇄ compact, hide-to-tray, quit).
   final WindowModeController windowController;
 
+  /// journey-scene-v2 #5: the per-surface OS occlusion/visibility seam. Drives
+  /// the shared scene's animate-when-visible / pause-when-hidden behaviour.
+  final WindowVisibilityController windowVisibility;
+
   /// The tray/menu-bar controller seam (icon/menu + action stream).
   final TrayController trayController;
 
   /// The one-time hide-to-tray hint persistence seam (AC-17).
   final HideToTrayHintRepository hideToTrayHintRepository;
 
-  /// The restored route selection, or `null` for a fresh start.
-  final RouteSelection? savedSelection;
+  /// The restored authored route plan (v2 — ADR-0005), or `null` for a fresh
+  /// start. A legacy v1 selection blob is already migrated forward to a plan by
+  /// the repository's `loadPlan` (AC-12).
+  final RoutePlan? savedPlan;
 
   /// The restored settings, or `null` for defaults.
   final AppSettings? savedSettings;
@@ -183,6 +206,7 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
   late final ActivityPlugin _activityPlugin;
   late final JourneyCubit _cubit;
   late final RouteProgressCubit _routeCubit;
+  late final MapCubit _mapCubit;
   late final StatsCubit _statsCubit;
   late final SettingsCubit _settingsCubit;
   late final AppShellCubit _shellCubit;
@@ -216,11 +240,23 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
     );
 
     _cubit = JourneyCubit();
+    // route-planner-v2 (ADR-0005): the route cubit holds the FULL chain +
+    // geography and derives the active plan's SUB-CHAIN, running the unchanged
+    // resolver over it (AC-7) and computing country % itself (decision 3). A
+    // restored active/completed plan seeds it (AC-12).
     _routeCubit = RouteProgressCubit(
       chain: vietnamProvinceChain,
+      geography: vietnamProvinceGeography,
       repository: widget.routeRepository,
-      initialSelection: widget.savedSelection,
+      initialPlan: widget.savedPlan,
     );
+    // map-experience: the map slice's projection cubit. A PURE read-only
+    // consumer (AC-12) — it holds no engine/plugin reference. It is fed the
+    // SAME `JourneyProgress` aggregate the ticker already forwards to stats
+    // (segments + cumulative distance) and the route cubit's resolved state. The
+    // full geography is the fallback; a v2 route supplies its sub-geography via
+    // the route view state (AC-7).
+    _mapCubit = MapCubit(geography: vietnamProvinceGeography);
     _statsCubit = StatsCubit(
       clock: _clock,
       historyRepository: widget.historyRepository,
@@ -246,10 +282,23 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
     // Feed route position to stats on the route cubit's stream (plain snapshot
     // — no cubit reference crosses the seam, TC-026).
     _routeCubit.stream.listen(_onRouteChanged);
+    // route-planner-v2 / map-experience (AC-12): seed the map projection cubit
+    // with the route cubit's CURRENT (restored) view state — the constructor
+    // emitted it before the listener above was attached, so push it once now so a
+    // restored route's base road + (sub-)geography + red trace are present on
+    // launch. For a restored plan this carries the sub-geography (AC-7).
+    _mapCubit.updateFromRoute(_routeCubit.state);
 
     // Restore stats from persisted stores + the engine's restored snapshot
     // (records an app-closed-across-midnight prior day before zeroing, AC-19).
     _statsCubit.load(_engine.toProgress());
+
+    // map-experience (AC-8 / TC-215): seed the map projection cubit with the
+    // engine's RESTORED snapshot so the current-route red trace is present
+    // immediately on launch (before the first tick), not only after the first
+    // tick arrives. The engine restores its persisted `segments` on construction
+    // (JourneyProgress.segments), so this is the restored trace.
+    _mapCubit.updateFromSnapshot(_engine.toProgress());
 
     _ticker.start();
 
@@ -267,15 +316,20 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
     );
 
     // Route tray menu actions → the window controller (AC-12). The tray holds
-    // no window logic itself; the mapping lives here.
+    // no window logic itself; the mapping lives here. Each transition is guarded
+    // (S1): the controller now rethrows on failure (after driving itself to a
+    // consistent state), so we log rather than leak an unhandled future.
     _trayActionsSub = widget.trayController.actions.listen((action) {
       switch (action) {
         case TrayAction.showApp:
-          widget.windowController.showApp();
+          _guardTransition('showApp', widget.windowController.showApp());
         case TrayAction.enterCompact:
-          widget.windowController.enterCompact();
+          _guardTransition(
+            'enterCompact',
+            widget.windowController.enterCompact(),
+          );
         case TrayAction.quit:
-          widget.windowController.quit();
+          _guardTransition('quit', widget.windowController.quit());
       }
     });
 
@@ -311,6 +365,16 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
     widget.trayController.setStatusLine(JourneyTrayMapper.statusLineFor(s));
   }
 
+  /// Guards a fire-and-forget window transition (S1): the controller now
+  /// rethrows on failure (after driving itself to a consistent state), so log
+  /// the failure rather than let it become an unhandled future or silently
+  /// desync the UI.
+  void _guardTransition(String action, Future<void> future) {
+    future.catchError((Object error, StackTrace stack) {
+      debugPrint('Window transition "$action" failed: $error');
+    });
+  }
+
   /// Flushes the latest persisted state before Quit (AC-16). Reuses the shipped
   /// repositories' save paths and engine snapshot — it invents NO persistence.
   /// The route selection is already persisted by the route cubit on change, and
@@ -327,6 +391,10 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
   }
 
   void _onRouteChanged(RouteViewState state) {
+    // map-experience: feed the route selection + resolved position to the map
+    // projection cubit (read-only — AC-12). Keyed off the same route stream the
+    // stats slice consumes; no engine reference crosses the seam.
+    _mapCubit.updateFromRoute(state);
     final position = state.position;
     _statsCubit.updateRoute(
       position == null
@@ -361,9 +429,14 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
       clock: _clock,
       cubit: _cubit,
       onDistance: _routeCubit.updateFromDistance,
-      // Stats sink: forward the engine's aggregate snapshot once per tick,
+      // Stats + map sink: forward the engine's aggregate snapshot once per tick,
       // mirroring the onDistance pattern (only a value object crosses, AC-1).
-      onSnapshot: (JourneyProgress snapshot) => _statsCubit.onTick(snapshot),
+      // map-experience reads the snapshot's `segments` for the red idle trace
+      // (Decision C) — a pure read, no engine reference (AC-12).
+      onSnapshot: (JourneyProgress snapshot) {
+        _statsCubit.onTick(snapshot);
+        _mapCubit.updateFromSnapshot(snapshot);
+      },
       log: (String message) => debugPrint(message),
     );
   }
@@ -406,10 +479,12 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
     _shellCubit.close();
     // Tear down the native window + tray seams (mocks are no-ops on real OS).
     widget.windowController.dispose();
+    widget.windowVisibility.dispose();
     widget.trayController.dispose();
     _ticker.dispose();
     _cubit.close();
     _routeCubit.close();
+    _mapCubit.close();
     _statsCubit.close();
     _settingsCubit.close();
     super.dispose();
@@ -419,6 +494,7 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Vietnam Focus Journey',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
       ),
@@ -426,6 +502,7 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
         providers: <BlocProvider<dynamic>>[
           BlocProvider<JourneyCubit>.value(value: _cubit),
           BlocProvider<RouteProgressCubit>.value(value: _routeCubit),
+          BlocProvider<MapCubit>.value(value: _mapCubit),
           BlocProvider<StatsCubit>.value(value: _statsCubit),
           BlocProvider<SettingsCubit>.value(value: _settingsCubit),
           BlocProvider<AppShellCubit>.value(value: _shellCubit),
@@ -437,6 +514,7 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
         child: AppShell(
           clock: _clock,
           controller: widget.windowController,
+          visibility: widget.windowVisibility,
           fullBuilder: (JourneyGame sharedGame) {
             return BlocBuilder<SettingsCubit, AppSettings>(
               buildWhen: (prev, next) =>
@@ -452,6 +530,7 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
                 return _HomeTabs(
                   clock: _clock,
                   chain: vietnamProvinceChain,
+                  geography: vietnamProvinceGeography,
                   sharedGame: sharedGame,
                 );
               },
@@ -473,11 +552,13 @@ class _HomeTabs extends StatefulWidget {
   const _HomeTabs({
     required this.clock,
     required this.chain,
+    required this.geography,
     required this.sharedGame,
   });
 
   final Clock clock;
   final ProvinceChain chain;
+  final ProvinceGeography geography;
   final JourneyGame sharedGame;
 
   @override
@@ -494,13 +575,30 @@ class _HomeTabsState extends State<_HomeTabs> {
         index: _index,
         children: <Widget>[
           // The journey tab binds to the shared scene + carries the PiP control.
+          // The Flame scene fills the whole tab; the map rides on top as a
+          // small MOBA-style minimap floating bottom-right (map-experience
+          // AC-1: no standalone Map tab — the map lives here, full-screen on
+          // tap). The reduce-motion indicator (top-left), distance counter
+          // (top-right), and PiP button (bottom-left) keep the other corners,
+          // so the minimap's bottom-right corner is clear.
           Stack(
             children: <Widget>[
-              JourneyScreen(clock: widget.clock, sharedGame: widget.sharedGame),
+              // The Flame journey scene fills the whole tab.
+              Positioned.fill(
+                child: JourneyScreen(
+                  clock: widget.clock,
+                  sharedGame: widget.sharedGame,
+                ),
+              ),
+              // The minimap floats bottom-right (AC-1/AC-2) — the overlay
+              // anchors itself; tap opens the full-screen map.
+              InlineMapOverlay(
+                chain: widget.chain,
+                geography: widget.geography,
+              ),
               const _CompactPipButton(),
             ],
           ),
-          RouteMapScreen(chain: widget.chain),
           const StatsScreen(),
           const BadgesScreen(),
           const SettingsScreen(),
@@ -514,7 +612,6 @@ class _HomeTabsState extends State<_HomeTabs> {
             icon: Icon(Icons.directions_bike),
             label: 'Journey',
           ),
-          NavigationDestination(icon: Icon(Icons.map), label: 'Map'),
           NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Stats'),
           NavigationDestination(
             icon: Icon(Icons.emoji_events),
@@ -550,7 +647,16 @@ class _CompactPipButton extends StatelessWidget {
                 Icons.picture_in_picture_alt,
                 color: Colors.white,
               ),
-              onPressed: () => context.read<AppShellCubit>().enterCompact(),
+              onPressed: () {
+                // Guarded (S1): enterCompact may rethrow; log rather than leak
+                // an unhandled future.
+                context.read<AppShellCubit>().enterCompact().catchError((
+                  Object error,
+                  StackTrace stack,
+                ) {
+                  debugPrint('enterCompact (PiP button) failed: $error');
+                });
+              },
             ),
           ),
         ),

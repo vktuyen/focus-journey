@@ -5,6 +5,7 @@
 // and the forward-incompatible enum fallbacks. No I/O, no real preferences.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:focus_journey/features/journey/domain/activity_segment.dart';
 import 'package:focus_journey/features/journey/domain/journey_progress.dart';
 import 'package:focus_journey/features/journey/domain/journey_state.dart';
 import 'package:focus_journey/features/journey/domain/travel_mode.dart';
@@ -112,4 +113,67 @@ void main() {
       });
     },
   );
+
+  group('JourneyProgress — segment record persistence (idle-accounting (c))', () {
+    final segments = <ActivitySegment>[
+      const ActivitySegment(
+        fromKm: 0,
+        toKm: 2,
+        elapsed: Duration(minutes: 1),
+        classification: SegmentClassification.active,
+        cause: SegmentCause.none,
+      ),
+      const ActivitySegment(
+        fromKm: 2,
+        toKm: 2,
+        elapsed: Duration(minutes: 5),
+        classification: SegmentClassification.idle,
+        cause: SegmentCause.voluntary,
+      ),
+    ];
+
+    test('segments_roundTripLosslessly', () {
+      final original = JourneyProgress(
+        distanceKm: 2,
+        activeTimeToday: const Duration(minutes: 1),
+        rawActiveTime: const Duration(minutes: 1),
+        idleTimeToday: const Duration(minutes: 5),
+        state: JourneyState.idle,
+        mode: TravelMode.motorbike,
+        storedDate: DateTime(2026, 6, 23),
+        segments: segments,
+      );
+
+      final restored = JourneyProgress.fromJson(original.toJson());
+
+      expect(restored.segments, segments);
+      expect(restored, original);
+    });
+
+    test('absentSegmentsKey_legacyBlob_restoresEmptyList', () {
+      // A pre-feature persisted blob has no 'segments' key — it must restore as
+      // an empty list, not crash (forward/backward compatibility).
+      final json = _sample().toJson()..remove('segments');
+
+      final restored = JourneyProgress.fromJson(json);
+
+      expect(restored.segments, isEmpty);
+    });
+
+    test('nonListSegments_throwsFormatException', () {
+      final json = _sample().toJson()..['segments'] = 'not-a-list';
+
+      expect(() => JourneyProgress.fromJson(json), throwsFormatException);
+    });
+
+    test('listWithNonObjectElement_throwsFormatException', () {
+      // segments IS a list, but an element is a non-object (a bare string). The
+      // absent-key and non-list cases are covered above; this closes the
+      // list-with-bad-element gap (S-4). load() then treats the whole blob as
+      // "no saved progress" rather than crashing.
+      final json = _sample().toJson()..['segments'] = <Object?>['x'];
+
+      expect(() => JourneyProgress.fromJson(json), throwsFormatException);
+    });
+  });
 }

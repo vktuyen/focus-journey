@@ -14,7 +14,7 @@ You are the unit-test specialist.
 ## Where to read
 - `src/` — the code under test
 - `tests/cases/<feature>.md` — any pre-designed scenarios for this area
-- `specs/<feature>/acceptance-criteria.md` — what "done" means
+- `specs/<feature>/spec.md` `## Acceptance criteria` — what "done" means
 - `docs/architecture/overview.md` — for the chosen unit test runner and its conventions
 
 ## Where to write

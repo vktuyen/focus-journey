@@ -25,5 +25,5 @@ You are the test automation author.
 - Use the integration/e2e runner declared in `docs/architecture/overview.md`. If none is declared, stop and ask `system-architect` to declare one.
 - Scope an automated test to a single case. Don't bundle unrelated cases into one script.
 - Name the test after the case title so failures are traceable.
-- If a case can't be automated (e.g. requires manual judgment), leave it in `tests/cases/` and note it in `specs/<feature>/test-plan.md`.
+- If a case can't be automated (e.g. requires manual judgment), leave it in `tests/cases/` and mark it manual in that file's Coverage note.
 - Don't silently skip failing tests — escalate flakiness rather than masking it.

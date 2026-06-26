@@ -143,7 +143,10 @@ void main() {
       // Lands fully inside the FIRST display (the clamp target).
       expect(result.x, greaterThanOrEqualTo(primary.left));
       expect(result.y, greaterThanOrEqualTo(primary.top));
-      expect(result.x + CompactGeometry.width, lessThanOrEqualTo(primary.right));
+      expect(
+        result.x + CompactGeometry.width,
+        lessThanOrEqualTo(primary.right),
+      );
       expect(
         result.y + CompactGeometry.height,
         lessThanOrEqualTo(primary.bottom),

@@ -6,6 +6,7 @@
 
 #include "activity_channel.h"
 #include "flutter/generated_plugin_registrant.h"
+#include "window_visibility_channel.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -33,6 +34,12 @@ bool FlutterWindow::OnCreate() {
   // and subscribe this window to session lock/unlock notifications.
   ActivityChannel::Register(flutter_controller_->engine(), GetHandle());
 
+  // Register the per-surface window-visibility (occlusion) channel
+  // (journey-scene-v2 #5). Reads ONLY this window's own minimized/hidden/cloaked
+  // state - no other-app or input data (NFR-2). On Windows this is the
+  // minimized/hidden fallback (no reliable arbitrary-window occlusion API).
+  WindowVisibilityChannel::Register(flutter_controller_->engine(), GetHandle());
+
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -49,6 +56,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   ActivityChannel::Unregister(GetHandle());
+  WindowVisibilityChannel::Unregister();
 
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -81,6 +89,18 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // here — falling through to Win32Window::MessageHandler below keeps
       // default window processing for this message intact (N2).
       ActivityChannel::HandleSessionChange(wparam);
+      break;
+    case WM_SIZE:
+      // SIZE_MINIMIZED / SIZE_RESTORED / SIZE_MAXIMIZED change whether the
+      // window has pixels on screen. We only READ our own window state; no
+      // input or other-app data (NFR-2). Do NOT return - fall through to
+      // Win32Window so the child surface still gets resized.
+      WindowVisibilityChannel::HandleVisibilityMessage();
+      break;
+    case WM_SHOWWINDOW:
+    case WM_WINDOWPOSCHANGED:
+      // Shown/hidden (e.g. window_manager hide()/show()) or moved/cloaked.
+      WindowVisibilityChannel::HandleVisibilityMessage();
       break;
   }
 

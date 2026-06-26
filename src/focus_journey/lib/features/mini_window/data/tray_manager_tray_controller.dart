@@ -87,8 +87,16 @@ class TrayManagerTrayController with TrayListener implements TrayController {
   Future<void> setStatusLine(String? statusLine) async {
     if (_statusLine == statusLine) return;
     _statusLine = statusLine;
+    // IMPORTANT (macOS click-dispatch correctness): the status line is a
+    // VOLATILE, per-tick value (the live "X.X km" readout). It is surfaced via
+    // the tooltip ONLY — it must NOT rebuild the context menu. `tray_manager`'s
+    // `setContextMenu` regenerates fresh menu-item ids on every call, while the
+    // NATIVELY-displayed menu retains the ids it was built with; the Dart-side
+    // click router (`_menu.getMenuItemById(id)`) then can't resolve the clicked
+    // id and `onTrayMenuItemClick` silently no-ops. Rebuilding the menu only
+    // when its STRUCTURE changes (mode → `setMode`) keeps the displayed menu's
+    // ids in sync with the Dart map, so menu-item clicks reliably fire on macOS.
     await _applyTooltip();
-    await _applyMenu();
   }
 
   // --- TrayListener ---
@@ -170,12 +178,14 @@ class TrayManagerTrayController with TrayListener implements TrayController {
 
   Future<void> _applyMenu() async {
     // Mode-aware labels/enablement (AC-14, P2). The action set is stable; we
-    // only disable the action that is a no-op for the current mode.
+    // only disable the action that is a no-op for the current mode. This menu is
+    // rebuilt ONLY when its structure changes (init / `setMode`) — NEVER on the
+    // per-tick status-line update — so the natively-displayed menu's item ids
+    // stay in sync with `tray_manager`'s Dart-side id→item map and clicks fire
+    // reliably on macOS (see `setStatusLine`). The live distance readout lives
+    // in the tooltip, not as a churning menu item.
     final inCompact = _mode == WindowMode.compact;
     final items = <MenuItem>[
-      if (_statusLine != null)
-        MenuItem(key: 'status', label: _statusLine!, disabled: true),
-      if (_statusLine != null) MenuItem.separator(),
       MenuItem(key: _keyShowApp, label: 'Show app'),
       MenuItem(
         key: _keyEnterCompact,

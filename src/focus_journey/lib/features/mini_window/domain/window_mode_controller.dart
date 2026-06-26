@@ -31,6 +31,22 @@ abstract interface class WindowModeController {
   /// mode (AC-14). Emits the new [WindowMode] after each successful transition.
   Stream<WindowMode> get modeChanges;
 
+  /// Whether ANY app window is currently on screen. This is the ONE source of
+  /// truth the shell uses to pause the shared `JourneyGame` when nothing is
+  /// visible (NFR-1): `windowManager.hide()` does NOT reliably change
+  /// `AppLifecycleState` on desktop, so the scene would otherwise keep spinning
+  /// with no window shown. `false` while hidden-to-tray; `true` whenever the
+  /// full or compact window is shown/foregrounded. Reports a window-visibility
+  /// fact only — no user data (NFR-4).
+  bool get isWindowVisible;
+
+  /// De-duplicated stream of [isWindowVisible] transitions (no identical
+  /// consecutive emissions). Emits `true` on the initial show ([setup]),
+  /// [showApp], [enterCompact], [exitFull]; `false` on [hideToTray] / the
+  /// close-button intercept. The shell subscribes to drive
+  /// `pauseEngine()`/`resumeEngine()` on the single game loop (NFR-1).
+  Stream<bool> get windowVisibilityChanges;
+
   /// Enters the compact PiP (AC-6): resize to the FIXED compact size, make the
   /// window frameless / hidden title bar, set always-on-top, reposition to the
   /// persisted compact position (clamped onto a visible display; falls back to
