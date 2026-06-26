@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Desktop-only app (macOS + Windows, per docs/architecture/overview.md).
+# `flutter` scaffolds mobile/web platforms by default — ignore them so a stray
+# `flutter create`/`pub get` can't regenerate-and-commit dead-weight platform
+# dirs. Only macos/ and windows/ are tracked.
+/ios/
+/android/
+/web/
+/linux/
