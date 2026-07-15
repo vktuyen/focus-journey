@@ -20,12 +20,19 @@ _Last updated: 2026-07-15_
   AC-1..12 + NFR-2 `[x]`. **`active/` is now empty.** Carried follow-ups (see the done ledger): reset-seam
   ADR (`/add-adr`), drift-guard + NFR static tests, launch-at-startup-OS-state question, product-copy TODOs,
   and the on-device/Windows release legs.
+- ✅ **`vietnam-map-fidelity` SHIPPED 2026-07-15** (dev build, macOS-verified) — in [done/](done/vietnam-map-fidelity.md).
+  Current 34-province (2026) map: bundled GeoJSON `PolygonLayer` (ADR-0008), single-tone, **OSM tiles dropped →
+  ZERO network egress**, CC BY-SA credit. Review resolved (option A) · privacy PASS · tests green (1297/1/0);
+  AC-1..11 + NFR-2 `[x]`. **Sibling `province-chain-2026` is now UNBLOCKED** — rebuilds the journey data model
+  onto the 34 units + fixes the carried route-hugs-coast geometry. **👉 `/new-feature province-chain-2026`.**
 
 ### 👉 Immediate next action (2026-07-15)
-**`refine-app-ui-ux` wave is open; its first slice `journey-reset` shipped. `active/` is empty — pick the next move:**
-- **Continue the wave:** define the next UI/UX-refinement slice(s) and `/capture-idea <slug>` → `/new-feature`.
-- **Or harden `journey-reset` follow-ups:** write the reset-seam ADR (`/add-adr`), add the drift-guard/NFR
-  static tests, and resolve the launch-at-startup + copy questions.
+**`refine-app-ui-ux` wave: `journey-reset` + `vietnam-map-fidelity` both SHIPPED. `active/` is empty.**
+- **👉 Promote the now-unblocked sibling:** `/new-feature province-chain-2026` — rebuild the journey
+  province/route data model onto the 34 units (+ fix the carried route-hugs-coast geometry). Its `/new-feature`
+  will need `product-domain-expert` + `system-architect` framing (spine on 34 units, distances, migration).
+- **Or harden `journey-reset` follow-ups:** reset-seam ADR (`/add-adr`), drift-guard/NFR static tests,
+  launch-at-startup + copy questions.
 - **Or release-readiness:** burn down the carried on-device / Windows legs across shipped slices.
   _(Further UI/UX-refinement slices for this wave: TBD — capture with `/capture-idea`.)_
 
@@ -209,7 +216,15 @@ Theme: refine the app's UI/UX. Promote each slice with `/new-feature <slug>` in 
   (Start-over reuses the ADR-0005 `abandoned` lifecycle, keeps lifetime stats). **✅ SHIPPED 2026-07-15**
   (dev build, macOS-verified) — review approved (0 Blocking), privacy PASS, tests **green 1235/1235**;
   in [done/](done/journey-reset.md).
-- _More UI/UX-refinement slices: TBD — capture with `/capture-idea <slug>` as they're defined._
+- **vietnam-map-fidelity** — Vietnam's current **2026 / 34-province** map (accurate, offline, georeferenced),
+  journey overlaid. **✅ SHIPPED 2026-07-15** (dev build, macOS-verified) per **ADR-0008** (SVG→GeoJSON
+  `PolygonLayer`, single-tone, OSM tiles dropped → **zero egress**, CC BY-SA credit); review resolved (opt A),
+  privacy PASS, tests green 1297/1/0; AC-1..11 + NFR-2 `[x]`; in [done/](done/vietnam-map-fidelity.md).
+- **province-chain-2026** — rebuild the journey province/route **data model** onto the 34 current units +
+  centre coordinates + distances (migrate the shipped 13-stop chain; ADR-0005 sub-chains) + fix the carried
+  route-hugs-coast geometry. **📋 Backlog — now UNBLOCKED** `[blocked by: vietnam-map-fidelity ✅]`. Uses the
+  inlined 34-unit dataset. **👉 `/new-feature province-chain-2026`.**
+- _Further UI/UX slices: TBD — `/capture-idea <slug>` as defined._
 
 ### Now (history) — Wave 2 (v2), STARTED 2026-06-24
 - **mini-window** — ✅ SHIPPED 2026-06-24 (macOS-verified). ⚠️ Windows tray-icon authoring + Windows

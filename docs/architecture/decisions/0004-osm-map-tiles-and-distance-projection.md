@@ -1,6 +1,6 @@
 # ADR-0004: OSM map tiles (first network egress) + canonical-km distance→polyline projection
 
-- Status: accepted
+- Status: accepted (part (a) tile-egress **amended by ADR-0008** — OSM `TileLayer` dropped, egress → 0; part (b) canonical-km projection unchanged)
 - Date: 2026-06-24
 - Deciders: Kevin (Tuyen Vo) / system-architect
 

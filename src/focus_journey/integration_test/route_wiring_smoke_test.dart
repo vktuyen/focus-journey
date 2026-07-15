@@ -15,8 +15,9 @@
 // accrual (that is journey-engine's suite) — it asserts the seam delivers the
 // scalar and the cubit consumes it. The standalone Map tab (RouteMapScreen) was
 // removed in the map-experience slice; the surface under test is now the
-// re-homed `InlineMapOverlay`, pumped with a [FakeTileProvider] so the smoke
-// makes ZERO real OSM tile requests.
+// re-homed `InlineMapOverlay`. Per ADR-0008(c) the OSM `TileLayer` was DROPPED,
+// so the surface is offline by construction (a bundled base [BaseMapGeometry]) —
+// the smoke makes ZERO network requests with no tile provider to fake.
 //
 // Runs under `flutter test` (headless) and on a desktop device:
 //   fvm flutter test integration_test/route_wiring_smoke_test.dart
@@ -31,6 +32,7 @@ import 'package:focus_journey/features/journey/domain/clock.dart';
 import 'package:focus_journey/features/journey/domain/journey_engine.dart';
 import 'package:focus_journey/features/journey/presentation/activity_ticker.dart';
 import 'package:focus_journey/features/journey/presentation/journey_cubit.dart';
+import 'package:focus_journey/features/route/domain/base_map_geometry.dart';
 import 'package:focus_journey/features/route/domain/journey_direction.dart';
 import 'package:focus_journey/features/route/domain/province.dart';
 import 'package:focus_journey/features/route/domain/province_chain.dart';
@@ -38,6 +40,7 @@ import 'package:focus_journey/features/route/domain/province_geography.dart';
 import 'package:focus_journey/features/route/domain/route_plan.dart';
 import 'package:focus_journey/features/route/domain/route_repository.dart';
 import 'package:focus_journey/features/route/domain/route_selection.dart';
+import 'package:focus_journey/features/route/presentation/base_map_layer.dart';
 import 'package:focus_journey/features/route/presentation/map_cubit.dart';
 import 'package:focus_journey/features/route/presentation/map_surface.dart';
 import 'package:focus_journey/features/route/presentation/route_progress_cubit.dart';
@@ -83,14 +86,20 @@ ProvinceGeography _fixtureGeography(ProvinceChain chain) => ProvinceGeography(
   },
 );
 
-/// A fake tile provider — NEVER touches the network (the wiring smoke must not
-/// make a real OSM request when it renders the re-homed map surface).
-class FakeTileProvider extends TileProvider {
-  @override
-  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
-    return MemoryImage(TileProvider.transparentImage);
-  }
-}
+/// The bundled offline base geometry (ADR-0008): a land ring enclosing the
+/// fixture chain. No asset, no network — the surface renders it directly.
+BaseMapGeometry _baseMap() => BaseMapGeometry(
+  landRings: const <List<GeoCoordinate>>[
+    <GeoCoordinate>[
+      GeoCoordinate(latitude: 8.0, longitude: 103.0),
+      GeoCoordinate(latitude: 8.0, longitude: 109.8),
+      GeoCoordinate(latitude: 23.5, longitude: 109.8),
+      GeoCoordinate(latitude: 23.5, longitude: 103.0),
+      GeoCoordinate(latitude: 8.0, longitude: 103.0),
+    ],
+  ],
+  provinceRings: const <List<GeoCoordinate>>[],
+);
 
 /// An in-memory [RouteRepository] that records writes — proves route-progress
 /// only ever persists its own selection, never resets engine state.
@@ -170,7 +179,7 @@ void main() {
               body: InlineMapOverlay(
                 chain: chain,
                 geography: geography,
-                tileProvider: FakeTileProvider(),
+                baseMap: _baseMap(),
               ),
             ),
           ),
@@ -220,8 +229,18 @@ void main() {
       expect(mapCubit.state.position!.next!.name, 'Đà Lạt');
       expect(mapCubit.state.markerPosition, isNotNull);
 
-      // The re-homed map surface rendered (proving the consume path reaches UI).
+      // The re-homed map surface rendered (proving the consume path reaches UI)
+      // over the bundled OFFLINE base (a PolygonLayer with the land fill) and
+      // with NO OSM tile layer (ADR-0008(c) drop — offline by construction).
       expect(find.byType(InlineMapOverlay), findsOneWidget);
+      final baseLayers = tester.widgetList<PolygonLayer<Object>>(
+        find.byType(PolygonLayer<Object>),
+      );
+      expect(
+        baseLayers.any((l) => l.polygons.any((p) => p.color == kLandFill)),
+        isTrue,
+      );
+      expect(find.byType(TileLayer), findsNothing);
 
       // Route-progress never mutated the engine: feeding more distance does not
       // change engine.activeTimeToday and the repo saw only the start write.

@@ -9,13 +9,15 @@
 /// mouse-position history, or window titles; everything about WHAT YOU DO stays
 /// on your machine with no account; notifications (`local_notifier`) and
 /// launch-at-startup (`launch_at_startup`) are local OS capabilities that add no
-/// such surface. THE ONE NETWORK EXCEPTION (map-experience): the map tab fetches
-/// anonymous OpenStreetMap map tiles to draw the real Vietnam map — those
-/// requests carry no personal data, no identifiers, and no activity/idle data,
-/// and the offline card below must say so truthfully.
+/// such surface. NETWORK: since vietnam-map-fidelity (ADR-0008) the Vietnam map
+/// is a BUNDLED offline asset and the OSM tile layer was dropped, so the app now
+/// makes NO network requests at all — egress is zero. The offline card below
+/// must say so truthfully.
 library;
 
 import 'package:flutter/material.dart';
+
+import '../../route/presentation/map_view.dart' show kBaseMapAttribution;
 
 /// What the app reads — keep in sync with the actual `ActivityPlugin` surface.
 const List<String> kPrivacyReads = <String>[
@@ -122,11 +124,19 @@ class PrivacyContent extends StatelessWidget {
                 Text(
                   'There is no account, no cloud sync, no servers, and no '
                   'analytics. Nothing about what you do — your focus and idle '
-                  'activity — ever leaves your machine. To draw the real '
-                  'Vietnam map, the app does fetch anonymous map tiles from '
-                  'OpenStreetMap; those requests carry no personal data, no '
-                  'identifiers, no activity or idle data, and no tracking. '
+                  'activity — ever leaves your machine. The Vietnam map is a '
+                  'bundled offline map that draws with no network at all, so '
+                  'the app makes no network requests and works fully offline. '
                   'Notifications are local desktop toasts only.',
+                ),
+                SizedBox(height: 8),
+                // AC-9: the bundled base map is CC BY-SA 3.0 (share-alike), so
+                // credit it in an always-reachable place too — a journey-tab
+                // user may never open the full-screen map that carries the pill.
+                // Single-sourced from `kBaseMapAttribution`.
+                Text(
+                  kBaseMapAttribution,
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ],
             ),

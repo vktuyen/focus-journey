@@ -1,24 +1,22 @@
 /// Presentation layer. The shared real-geography map surface used BOTH inline on
-/// the journey tab and full-screen: a `flutter_map` [FlutterMap] with an OSM
-/// [TileLayer] (attribution shown — AC-11), a base-road [PolylineLayer]
-/// (projected real geography — AC-4), a red overlay for idle stretches
-/// (solid=voluntary / dashed=lock-sleep — AC-6/AC-9/NFR-3), and a [MarkerLayer]
-/// for checkpoint pins + the current-position marker (AC-5/AC-10).
+/// the journey tab and full-screen: a `flutter_map` [FlutterMap] whose base is
+/// the bundled, offline Vietnam 34-province [PolygonLayer] (vietnam-map-fidelity
+/// / ADR-0008 — always renders, even with no network), with the shipped overlays
+/// drawn ON TOP: a base-road [PolylineLayer] (projected real geography), a red
+/// overlay for idle stretches (solid=voluntary / dashed=lock-sleep —
+/// AC-8/NFR-3), and a [MarkerLayer] for checkpoint pins + the current-position
+/// marker. An in-app CC BY-SA 3.0 attribution credits the bundled base (AC-9).
 ///
-/// SEPARATION / PRIVACY INVARIANT (AC-12 / NFR-2 / TC-227/TC-230/TC-231): reads
-/// ONLY the injected [MapViewState] (derived purely from the engine's aggregate
-/// snapshot + the route selection, projected onto STATIC [ProvinceGeography]
-/// reference data). It imports NO `ActivityPlugin`, NO `MethodChannel`, NO
-/// geolocation/GPS, makes NO active-vs-idle decision, and accrues NO distance.
-/// The ONLY network egress is anonymous OSM tile GETs keyed by `{z}/{x}/{y}`
-/// (plus the required static User-Agent) — no user id, no location, no idle data
-/// (TC-231). `flutter_map` is used for static tile display + the static overlay
+/// SEPARATION / PRIVACY INVARIANT (NFR-2 / AC-10): reads ONLY the injected
+/// [MapViewState] + the STATIC bundled [BaseMapGeometry]. It imports NO
+/// `ActivityPlugin`, NO `MethodChannel`, NO geolocation/GPS, makes NO
+/// active-vs-idle decision, and accrues NO distance. ADR-0008(c) DROPPED the OSM
+/// `TileLayer`, so the surface issues ZERO network egress — the base is a
+/// bundled static asset. `flutter_map` renders the static polygons + overlays
 /// only; its camera/marker is never read back as the user's position.
 ///
-/// OFFLINE FALLBACK (AC-11 / TC-218/TC-219): a failed tile fetch is swallowed by
-/// [TileLayer.errorTileCallback] + an [TileLayer.errorImage]; the map's solid
-/// background remains, and the province road / markers / red trace still render
-/// on top — no exception bubbles to the journey tab.
+/// OFFLINE-FIRST (AC-1/AC-2): the base is a bundled asset, so it renders with no
+/// network and can never be a blank/grey canvas or an empty-tile placeholder.
 library;
 
 import 'package:flutter/material.dart';
@@ -26,65 +24,74 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../journey/domain/activity_segment.dart';
+import '../domain/base_map_geometry.dart';
+import 'base_map_layer.dart';
 import 'lat_lng_mapper.dart';
 import 'map_view_state.dart';
 
-/// The OSM tile URL template — a standard anonymous `{z}/{x}/{y}` endpoint. No
-/// user identifier, location, or session token is interpolated (TC-231).
-const String kOsmTileUrlTemplate =
-    'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+/// The required in-app attribution for the bundled Wikimedia base map. The base
+/// is CC BY-SA 3.0 (share-alike), so this credit is MANDATORY (AC-9) — unlike
+/// the CC0 scenery art. The shipped GeoJSON is a DERIVATIVE (reprojected,
+/// flattened, and simplified from the source SVG), so the credit states it was
+/// "modified" to satisfy CC BY-SA's attribution + share-alike terms. Kept here
+/// as the single source of the string (also surfaced on the onboarding privacy
+/// card so a journey-tab user who never opens the full map still sees it).
+const String kBaseMapAttribution =
+    'Base map: Vietnam administrative divisions 2025 by TUBS / PIkne — '
+    'modified (reprojected & simplified), CC BY-SA 3.0, via Wikimedia Commons';
 
-/// The package user-agent OSM tile policy requires (a static app identifier, not
-/// user data). Sent as the only non-coordinate part of a tile request (TC-231).
-const String kMapUserAgentPackageName = 'com.focusjourney.app';
-
-/// The single "drifted off" red the idle trace uses (AC-9: one colour; the cause
+/// The single "drifted off" red the idle trace uses (AC-8: one colour; the cause
 /// is conveyed by the stroke PATTERN, not a second hue).
 const Color kIdleRed = Color(0xFFD32F2F);
 
-/// The base-road colour (a calm slate so the red trace reads clearly on top).
+/// The base-road colour (a calm slate so the red trace reads clearly on top of
+/// the land fill).
 const Color kBaseRoadColor = Color(0xFF37474F);
 
-/// The flat background painted behind the compact minimap (no live tiles). A
-/// muted blue-grey "land" tone so the slate road + red idle trace read clearly.
-const Color kCompactMapBackground = Color(0xFFCAD5DC);
+/// The compact minimap background — the themed sea tone behind the bundled land
+/// polygons (the sea is the app's own background — ADR-0008(b)). Shared with the
+/// minimap card frame in `map_surface.dart`.
+const Color kCompactMapBackground = kSeaBackground;
 
-/// The shared map surface. Renders the projected base road, the red idle trace,
-/// the checkpoint pins, and the current-position marker over an OSM tile base.
+/// The shared map surface. Renders the bundled offline Vietnam base (34-province
+/// [PolygonLayer]) UNDER the projected base road, the red idle trace, the
+/// checkpoint pins, and the current-position marker. No tiles, no network.
 class MapView extends StatelessWidget {
-  /// Creates the map surface from a resolved [state].
+  /// Creates the map surface from a resolved [state] over the bundled
+  /// [baseMap] geometry.
   ///
-  /// [tileProvider] is an injectable seam (default: `flutter_map`'s
-  /// `NetworkTileProvider`) so tests can drive a fake success / timeout / error
-  /// provider with no real network (TC-218/TC-219/TC-231).
+  /// [baseMap] is the parsed, cached [BaseMapGeometry] loaded from the bundled
+  /// GeoJSON (injected via the composition root). When `null` / empty, no base
+  /// layer is drawn (back-compat for hosts that inject none). [compact] selects
+  /// the cheaper decimated geometry for the ~150px minimap (NFR-1) and hides the
+  /// per-checkpoint labels/attribution so it stays uncluttered.
   const MapView({
     required this.state,
-    this.tileProvider,
-    this.showTiles = true,
+    this.baseMap,
+    this.compact = false,
     super.key,
   });
 
   /// The resolved map view state (base road, marker, idle stretches).
   final MapViewState state;
 
-  /// Optional tile-provider override (test seam). `null` → OSM network tiles.
-  final TileProvider? tileProvider;
+  /// The bundled base-map geometry drawn beneath the overlays (AC-1/AC-2). When
+  /// `null`, the base layer is omitted (legacy/route-only hosts).
+  final BaseMapGeometry? baseMap;
 
-  /// Whether to render the live OSM [TileLayer] + its attribution pill.
+  /// Whether this is the compact minimap surface.
   ///
-  /// `true` (default) for the full-screen surface — live tiles + the required
-  /// '© OpenStreetMap contributors' attribution (AC-11). `false` for the
-  /// compact minimap (the floating HUD on the journey tab): the polylines,
-  /// markers, and red idle trace are painted over a flat themed background, so
-  /// the minimap is glanceable, stays overflow-safe at ~150px, AND makes NO
-  /// tile network calls at all (strictly fewer GETs — better for NFR-2). The
-  /// OSM tiles + attribution are reserved for the full-screen view, where they
-  /// are legible.
-  final bool showTiles;
+  /// `false` (default) for the full-screen surface — full-resolution base,
+  /// per-checkpoint labels, and the CC BY-SA attribution pill (AC-9). `true`
+  /// for the compact minimap (the floating HUD on the journey tab): the cheaper
+  /// decimated base + bare dots so the minimap stays glanceable and
+  /// overflow-safe at ~150px. Neither mode makes any network call (AC-10).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final basePoints = toLatLngs(state.baseRoutePolyline.points);
+    final base = baseMap;
     final map = FlutterMap(
       options: MapOptions(
         // Fit the whole route into view; falls back to a Vietnam-centred default
@@ -92,7 +99,7 @@ class MapView extends StatelessWidget {
         initialCameraFit: basePoints.length >= 2
             ? CameraFit.coordinates(
                 coordinates: basePoints,
-                padding: EdgeInsets.all(showTiles ? 48 : 12),
+                padding: EdgeInsets.all(compact ? 12 : 48),
               )
             : null,
         initialCenter: basePoints.isNotEmpty
@@ -105,38 +112,21 @@ class MapView extends StatelessWidget {
         ),
       ),
       children: <Widget>[
-        if (showTiles) _osmTileLayer(),
+        // The bundled Vietnam base FIRST so every overlay draws on top of it
+        // (z-order: base beneath, overlays above — AC-11).
+        if (base != null) ...buildBaseMapLayers(base, compact: compact),
         _baseRoadLayer(basePoints),
         ..._idleTraceLayers(),
         _markerLayer(),
-        if (showTiles) _attribution(),
+        // In-app CC BY-SA credit for the bundled base (AC-9) — full-screen only
+        // (the minimap surfaces it via the shared credit on the full map).
+        if (!compact) _attribution(),
       ],
     );
-    // In compact (minimap) mode there is no tile base, so paint the route over a
-    // flat themed background — keeps the polylines/markers/red trace legible.
-    if (!showTiles) {
-      return ColoredBox(color: kCompactMapBackground, child: map);
-    }
-    return map;
-  }
-
-  /// The OSM tile layer with a graceful offline fallback (AC-11): a failed tile
-  /// fetch is swallowed (no rethrow) and an error tile is shown over the map's
-  /// solid background, so the road/markers/red still render and the tab never
-  /// breaks (TC-219).
-  TileLayer _osmTileLayer() {
-    return TileLayer(
-      urlTemplate: kOsmTileUrlTemplate,
-      userAgentPackageName: kMapUserAgentPackageName,
-      tileProvider: tileProvider,
-      // Offline fallback: keep the (possibly stale) tile on error instead of a
-      // blank flash, and never rethrow (TC-219).
-      errorTileCallback: (tile, error, stackTrace) {
-        // Intentionally swallowed: a tile fetch failure must not bubble to the
-        // journey tab (AC-11). The base background + overlay remain visible.
-      },
-      evictErrorTileStrategy: EvictErrorTileStrategy.none,
-    );
+    // The sea is the app's own themed background behind the land polygons
+    // (ADR-0008(b)); paint it on BOTH surfaces so any area outside the landmass
+    // reads as sea, never a blank canvas.
+    return ColoredBox(color: kSeaBackground, child: map);
   }
 
   /// The base road: the projected province polyline (real lat/long, AC-4).
@@ -188,14 +178,14 @@ class MapView extends StatelessWidget {
   /// The checkpoint pins + the current-position marker. The marker is projected
   /// from `routeDistanceKm` (AC-5); at km=0 it sits on the start pin (AC-10).
   ///
-  /// On the FULL-SCREEN surface ([showTiles] == true) each checkpoint also gets
+  /// On the FULL-SCREEN surface ([compact] == false) each checkpoint also gets
   /// a legible province-name label under its pin and a desktop hover [Tooltip]
-  /// naming the stop — so the route's stops are identifiable on the real map.
-  /// The compact minimap ([showTiles] == false) keeps bare dots (no labels /
+  /// naming the stop — so the route's stops are identifiable on the base map.
+  /// The compact minimap ([compact] == true) keeps bare dots (no labels /
   /// tooltips) so it stays uncluttered at ~150px (minimap unchanged).
   MarkerLayer _markerLayer() {
     final checkpoints = state.checkpointCoordinates;
-    final labelled = showTiles;
+    final labelled = !compact;
     final markers = <Marker>[
       for (var i = 0; i < checkpoints.length; i++)
         Marker(
@@ -233,16 +223,13 @@ class MapView extends StatelessWidget {
     return MarkerLayer(markers: markers);
   }
 
-  /// Always-visible OSM attribution (AC-11 / TC-218 — required by OSM
-  /// tile-usage policy). The attribution text is rendered inline (no expand
-  /// button), so '© OpenStreetMap contributors' is legible on BOTH the inline
-  /// (IgnorePointer'd) surface and the full-screen surface — unlike
-  /// [RichAttributionWidget], whose sources stay collapsed behind an "i" button
-  /// that the inline overlay can never reveal. Kept unobtrusive: a small
-  /// translucent pill anchored bottom-right that wraps gracefully in narrow
-  /// surfaces (no overflow).
+  /// The required in-app CC BY-SA 3.0 credit for the bundled Wikimedia base
+  /// (AC-9). The base is share-alike, so the credit is MANDATORY (unlike the CC0
+  /// art). Rendered inline (no expand button) so [kBaseMapAttribution] is
+  /// legible; a small translucent pill anchored bottom-right that wraps
+  /// gracefully in narrow surfaces (no overflow).
   Widget _attribution() {
-    return const _OsmAttribution();
+    return const _BaseMapAttribution();
   }
 }
 
@@ -265,7 +252,7 @@ class _CheckpointPin extends StatelessWidget {
 /// A full-screen checkpoint: a teal dot, a desktop hover [Tooltip] naming the
 /// province, and a legible province-name label hanging below the dot. The label
 /// has a translucent dark background + shadow so the text stays readable over
-/// OSM tiles. Screen-reader recoverable via [Semantics] (NFR-3). The dot sits at
+/// the land fill. Screen-reader recoverable via [Semantics] (NFR-3). The dot sits at
 /// the top so it stays on the road vertex while the label hangs beneath it.
 /// (Full-screen only — the compact minimap keeps bare dots, unchanged.)
 class _CheckpointMarker extends StatelessWidget {
@@ -286,7 +273,7 @@ class _CheckpointMarker extends StatelessWidget {
       children: <Widget>[
         hoverable,
         const SizedBox(height: 2),
-        // Legible-over-tiles province name label.
+        // Legible-over-land-fill province name label.
         ExcludeSemantics(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -315,12 +302,12 @@ class _CheckpointMarker extends StatelessWidget {
   }
 }
 
-/// An always-visible, overflow-safe OSM attribution pill (AC-11 / TC-218). The
-/// '© OpenStreetMap contributors' text is rendered directly (no tap to reveal),
-/// anchored bottom-right and constrained so it wraps rather than overflowing on
-/// a narrow inline surface.
-class _OsmAttribution extends StatelessWidget {
-  const _OsmAttribution();
+/// An always-visible, overflow-safe CC BY-SA 3.0 attribution pill for the
+/// bundled Wikimedia base map (AC-9). The [kBaseMapAttribution] text is rendered
+/// directly (no tap to reveal), anchored bottom-right and constrained so it
+/// wraps rather than overflowing on a narrow surface. Share-alike → mandatory.
+class _BaseMapAttribution extends StatelessWidget {
+  const _BaseMapAttribution();
 
   @override
   Widget build(BuildContext context) {
@@ -329,17 +316,20 @@ class _OsmAttribution extends StatelessWidget {
         alignment: Alignment.bottomRight,
         child: Padding(
           padding: const EdgeInsets.all(4),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              child: Text(
-                '© OpenStreetMap contributors',
-                style: TextStyle(color: Colors.white, fontSize: 11),
-                softWrap: true,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Text(
+                  kBaseMapAttribution,
+                  style: TextStyle(color: Colors.white, fontSize: 11),
+                  softWrap: true,
+                ),
               ),
             ),
           ),

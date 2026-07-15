@@ -9,22 +9,22 @@
 // (polylines / markers / attribution / semantics) and the injected snapshot
 // values, never against literal pixels.
 //
-// THE FAKE TILE PROVIDER IS THE NETWORK SEAM. Every widget here injects a
-// [FakeTileProvider] so a test NEVER reaches a real OSM tile server — a real tile
-// fetch would be a bug (TC-218/TC-219/TC-231). The provider also records every
-// tile URL it is asked for, so TC-231 can assert the request payload is data-free.
+// OFFLINE BY CONSTRUCTION (ADR-0008). ADR-0008(c) DROPPED the OSM `TileLayer`, so
+// there is NO network seam left to fake: the base map is a bundled, static
+// [BaseMapGeometry] drawn as a `PolygonLayer`. [buildFixtureBaseMap] supplies a
+// deterministic geometry (a land ring generously enclosing the fixture chain +
+// a few province-outline rings) so a widget/integration test renders the base
+// with zero network, zero assets, zero timers — a real tile/network fetch is now
+// structurally impossible (AC-10 / NFR-2).
 //
 // No timers, no DateTime.now(), no real I/O, no network — every double here is
 // deterministic.
 
-import 'dart:typed_data';
-
-import 'package:flutter/widgets.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:focus_journey/features/journey/domain/activity_segment.dart';
 import 'package:focus_journey/features/journey/domain/journey_progress.dart';
 import 'package:focus_journey/features/journey/domain/journey_state.dart';
 import 'package:focus_journey/features/journey/domain/travel_mode.dart';
+import 'package:focus_journey/features/route/domain/base_map_geometry.dart';
 import 'package:focus_journey/features/route/domain/geo_polyline.dart';
 import 'package:focus_journey/features/route/domain/idle_trace_mapper.dart';
 import 'package:focus_journey/features/route/domain/journey_direction.dart';
@@ -174,35 +174,48 @@ List<IdleStretch> mapIdleStretches({
   projector: projector,
 );
 
-/// A fake [TileProvider] that NEVER touches the network. It satisfies tile
-/// requests from memory (a 1x1 transparent PNG) or, in [failing] mode, errors —
-/// simulating offline. It records every requested tile URL so TC-231 can assert
-/// the request payload carries no user data.
+/// A deterministic fake bundled base-map [BaseMapGeometry] for the widget +
+/// integration layer (vietnam-map-fidelity / ADR-0008). Stands in for the parsed
+/// GeoJSON asset so a test renders the offline base with NO asset load, NO
+/// network, NO timers.
 ///
-/// This is the network seam: injecting it guarantees a test makes zero real OSM
-/// requests. A test that hits the real network is a bug (RULES).
-class FakeTileProvider extends TileProvider {
-  FakeTileProvider({this.failing = false});
-
-  /// When true, every tile load fails (simulated offline / no-network — TC-219).
-  final bool failing;
-
-  /// Every tile URL this provider was asked to produce, in order. Lets TC-231
-  /// assert each request is an anonymous `{z}/{x}/{y}` GET with no user payload.
-  final List<String> requestedUrls = <String>[];
-
-  /// Whether any tile request reached this provider at all (proves the map used
-  /// the injected seam, not a real network provider).
-  bool get wasQueried => requestedUrls.isNotEmpty;
-
-  @override
-  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
-    requestedUrls.add(getTileUrl(coordinates, options));
-    if (failing) {
-      // Simulated offline: an ImageProvider whose bytes fail to decode. The
-      // TileLayer.errorTileCallback swallows it (no rethrow to the journey tab).
-      return MemoryImage(Uint8List.fromList(<int>[0, 1, 2, 3]));
-    }
-    return MemoryImage(TileProvider.transparentImage);
-  }
-}
+/// The single land ring is a rectangle generously enclosing the fixture chain's
+/// coordinates (lat 8.62..22.82, lon 104.72..108.44), so every checkpoint, the
+/// route polyline, and the current-position marker fall ON the landmass — never
+/// in the sea (AC-5/6/7). Three province-outline rings give the base its thin
+/// unit borders (AC-3). This is app-shipped reference geometry, never a device
+/// read (NFR-2).
+BaseMapGeometry buildFixtureBaseMap() => BaseMapGeometry(
+  landRings: const <List<GeoCoordinate>>[
+    <GeoCoordinate>[
+      GeoCoordinate(latitude: 8.0, longitude: 103.0),
+      GeoCoordinate(latitude: 8.0, longitude: 109.8),
+      GeoCoordinate(latitude: 23.5, longitude: 109.8),
+      GeoCoordinate(latitude: 23.5, longitude: 103.0),
+      GeoCoordinate(latitude: 8.0, longitude: 103.0),
+    ],
+  ],
+  provinceRings: const <List<GeoCoordinate>>[
+    <GeoCoordinate>[
+      GeoCoordinate(latitude: 9.0, longitude: 104.0),
+      GeoCoordinate(latitude: 9.0, longitude: 106.0),
+      GeoCoordinate(latitude: 11.0, longitude: 106.0),
+      GeoCoordinate(latitude: 11.0, longitude: 104.0),
+      GeoCoordinate(latitude: 9.0, longitude: 104.0),
+    ],
+    <GeoCoordinate>[
+      GeoCoordinate(latitude: 15.0, longitude: 107.0),
+      GeoCoordinate(latitude: 15.0, longitude: 109.0),
+      GeoCoordinate(latitude: 17.0, longitude: 109.0),
+      GeoCoordinate(latitude: 17.0, longitude: 107.0),
+      GeoCoordinate(latitude: 15.0, longitude: 107.0),
+    ],
+    <GeoCoordinate>[
+      GeoCoordinate(latitude: 20.0, longitude: 104.0),
+      GeoCoordinate(latitude: 20.0, longitude: 106.0),
+      GeoCoordinate(latitude: 22.5, longitude: 106.0),
+      GeoCoordinate(latitude: 22.5, longitude: 104.0),
+      GeoCoordinate(latitude: 20.0, longitude: 104.0),
+    ],
+  ],
+);

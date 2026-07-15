@@ -69,7 +69,9 @@ import 'features/reset/presentation/launch_gate_cubit.dart';
 import 'features/reset/presentation/launch_prompt.dart';
 import 'features/window_visibility/data/window_visibility_factory.dart';
 import 'features/window_visibility/domain/window_visibility_controller.dart';
+import 'features/route/data/base_map_repository.dart';
 import 'features/route/data/shared_preferences_route_repository.dart';
+import 'features/route/domain/base_map_geometry.dart';
 import 'features/route/domain/province_chain.dart';
 import 'features/route/domain/province_geography.dart';
 import 'features/route/domain/route_plan.dart';
@@ -98,6 +100,12 @@ Future<void> main() async {
   // Build SharedPreferences once at startup so loads/saves are done over one
   // instance (mirrors the established repository wiring intent).
   final prefs = await SharedPreferences.getInstance();
+
+  // vietnam-map-fidelity (ADR-0008): load + parse the bundled offline Vietnam
+  // 34-province base map ONCE at startup (a bundled static asset — no network,
+  // no location; AC-10). Parse failure must never block launch, so fall back to
+  // the empty base (the map degrades to overlays-on-sea rather than crashing).
+  final baseMap = await _loadBaseMap();
 
   // Register the local-notifier dep (privacy-clean — local OS toasts only, no
   // network). `setup` is required before any toast is shown. launch_at_startup
@@ -140,6 +148,7 @@ Future<void> main() async {
 
   runApp(
     FocusJourneyApp(
+      baseMap: baseMap,
       routeRepository: routeRepository,
       settingsRepository: settingsRepository,
       historyRepository: historyRepository,
@@ -153,6 +162,25 @@ Future<void> main() async {
   );
 }
 
+/// Loads the bundled Vietnam base-map geometry (ADR-0008). A parse/read failure
+/// must never block launch, so it degrades to the empty base (overlays render
+/// over the themed sea) rather than crashing the app.
+Future<BaseMapGeometry> _loadBaseMap() async {
+  try {
+    return await AssetBaseMapRepository().load();
+  } catch (error, stack) {
+    // Degrade to the empty base rather than crash, but never SILENTLY: a
+    // missing/renamed/malformed bundled asset otherwise reproduces a blank sea
+    // (AC-1/AC-2) with no signal. Log it with context so the regression is
+    // diagnosable (a pubspec/manifest drift shows up here, not just on screen).
+    debugPrint(
+      'Failed to load bundled base map "$kBaseMapAssetPath"; falling back to '
+      'the empty base (overlays render over the sea). Error: $error\n$stack',
+    );
+    return BaseMapGeometry.empty();
+  }
+}
+
 /// Root of the Vietnam Focus Journey app. The STABLE composition layer: it owns
 /// the long-lived native controllers, the persistence seams, and the Factory
 /// reset seam — all of which survive a Factory reset — and hosts the
@@ -160,6 +188,7 @@ Future<void> main() async {
 class FocusJourneyApp extends StatefulWidget {
   /// Creates the app root with the injected persistence + native seams.
   const FocusJourneyApp({
+    required this.baseMap,
     required this.routeRepository,
     required this.settingsRepository,
     required this.historyRepository,
@@ -171,6 +200,12 @@ class FocusJourneyApp extends StatefulWidget {
     required this.trayController,
     super.key,
   });
+
+  /// The bundled Vietnam base-map geometry (vietnam-map-fidelity / ADR-0008).
+  /// A long-lived static asset loaded once at startup and passed down to the map
+  /// surfaces; it survives a Factory reset (it is not part of the
+  /// reconstructable in-memory graph).
+  final BaseMapGeometry baseMap;
 
   /// The route persistence seam (used to re-read state after a reset too).
   final RouteRepository routeRepository;
@@ -321,6 +356,7 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
               child: _JourneyRuntime(
                 key: ValueKey<int>(_generation),
                 clock: _clock,
+                baseMap: widget.baseMap,
                 routeRepository: widget.routeRepository,
                 settingsRepository: widget.settingsRepository,
                 historyRepository: widget.historyRepository,
@@ -357,6 +393,7 @@ class _BootstrapSplash extends StatelessWidget {
 class _JourneyRuntime extends StatefulWidget {
   const _JourneyRuntime({
     required this.clock,
+    required this.baseMap,
     required this.routeRepository,
     required this.settingsRepository,
     required this.historyRepository,
@@ -372,6 +409,7 @@ class _JourneyRuntime extends StatefulWidget {
   });
 
   final Clock clock;
+  final BaseMapGeometry baseMap;
   final RouteRepository routeRepository;
   final SettingsRepository settingsRepository;
   final HistoryRepository historyRepository;
@@ -655,6 +693,7 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
                     clock: _clock,
                     chain: vietnamProvinceChain,
                     geography: vietnamProvinceGeography,
+                    baseMap: widget.baseMap,
                     sharedGame: sharedGame,
                   );
                 },
@@ -678,12 +717,14 @@ class _HomeTabs extends StatefulWidget {
     required this.clock,
     required this.chain,
     required this.geography,
+    required this.baseMap,
     required this.sharedGame,
   });
 
   final Clock clock;
   final ProvinceChain chain;
   final ProvinceGeography geography;
+  final BaseMapGeometry baseMap;
   final JourneyGame sharedGame;
 
   @override
@@ -711,6 +752,7 @@ class _HomeTabsState extends State<_HomeTabs> {
               InlineMapOverlay(
                 chain: widget.chain,
                 geography: widget.geography,
+                baseMap: widget.baseMap,
               ),
               const _CompactPipButton(),
             ],

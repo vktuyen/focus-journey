@@ -18,12 +18,12 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_map/flutter_map.dart';
 
 import '../../journey/domain/travel_mode.dart';
 import '../../stats/domain/app_settings.dart';
 import '../../stats/presentation/settings_cubit.dart';
 import '../../stats/presentation/vehicle_picker.dart';
+import '../domain/base_map_geometry.dart';
 import '../domain/province_chain.dart';
 import '../domain/province_geography.dart';
 import '../domain/route_planner.dart';
@@ -38,12 +38,12 @@ import 'route_progress_cubit.dart';
 /// full-screen map in the same window (AC-2).
 class InlineMapOverlay extends StatelessWidget {
   /// Creates the inline overlay over the injected [chain] / [geography] (picker
-  /// geometry + auto-insert). [tileProvider] is forwarded to [MapView] for the
-  /// test seam.
+  /// geometry + auto-insert). [baseMap] is the bundled Vietnam base geometry
+  /// forwarded to [MapView] (AC-1/AC-2).
   const InlineMapOverlay({
     required this.chain,
     required this.geography,
-    this.tileProvider,
+    this.baseMap,
     super.key,
   });
 
@@ -53,8 +53,8 @@ class InlineMapOverlay extends StatelessWidget {
   /// The static geography — drives the pure auto-insert (NFR-2).
   final ProvinceGeography geography;
 
-  /// Optional tile-provider override (test seam).
-  final TileProvider? tileProvider;
+  /// The bundled base-map geometry drawn beneath the overlays (AC-1/AC-2).
+  final BaseMapGeometry? baseMap;
 
   @override
   Widget build(BuildContext context) {
@@ -74,16 +74,15 @@ class InlineMapOverlay extends StatelessWidget {
         }
         // A compact, MOBA-style minimap floating as a HUD card. The whole card
         // is one tap target that opens the full-screen map (AC-2). It renders
-        // the route glanceably WITHOUT live OSM tiles (showTiles: false) — the
-        // base road, checkpoint pins, current-position marker, and the red idle
-        // trace (AC-6/AC-7/AC-9) over a flat background. No tiles ⇒ no tile
-        // network calls from the minimap (strictly fewer GETs — NFR-2).
+        // the bundled offline Vietnam base (decimated for the small size — NFR-1)
+        // with the base road, checkpoint pins, current-position marker, and the
+        // red idle trace on top (AC-2/AC-8). No network of any kind (AC-10).
         return _MinimapCard(
           onTap: () => openFullScreenMap(
             context,
             chain: chain,
             geography: geography,
-            tileProvider: tileProvider,
+            baseMap: baseMap,
           ),
           child: Stack(
             fit: StackFit.expand,
@@ -91,11 +90,7 @@ class InlineMapOverlay extends StatelessWidget {
               // Absorb map gestures so the minimap is a single tap target
               // (the full-screen surface is interactive instead).
               IgnorePointer(
-                child: MapView(
-                  state: state,
-                  tileProvider: tileProvider,
-                  showTiles: false,
-                ),
+                child: MapView(state: state, baseMap: baseMap, compact: true),
               ),
               const _ExpandHint(),
             ],
@@ -114,7 +109,7 @@ Future<void> openFullScreenMap(
   BuildContext context, {
   required ProvinceChain chain,
   required ProvinceGeography geography,
-  TileProvider? tileProvider,
+  BaseMapGeometry? baseMap,
 }) {
   final mapCubit = context.read<MapCubit>();
   final routeCubit = context.read<RouteProgressCubit>();
@@ -142,7 +137,7 @@ Future<void> openFullScreenMap(
         child: FullScreenMap(
           chain: chain,
           geography: geography,
-          tileProvider: tileProvider,
+          baseMap: baseMap,
         ),
       ),
     ),
@@ -157,7 +152,7 @@ class FullScreenMap extends StatelessWidget {
   const FullScreenMap({
     required this.chain,
     required this.geography,
-    this.tileProvider,
+    this.baseMap,
     super.key,
   });
 
@@ -167,8 +162,8 @@ class FullScreenMap extends StatelessWidget {
   /// The static geography — drives the pure auto-insert (NFR-2).
   final ProvinceGeography geography;
 
-  /// Optional tile-provider override (test seam).
-  final TileProvider? tileProvider;
+  /// The bundled base-map geometry drawn beneath the overlays (AC-1).
+  final BaseMapGeometry? baseMap;
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +202,9 @@ class FullScreenMap extends StatelessWidget {
                         // vehicle-picker AC-13: skippable, pre-seeded route-start
                         // vehicle control — present only when a SettingsCubit is
                         // mounted (else omitted, degrading gracefully).
-                        vehiclePicker: RouteStartVehiclePicker.maybeFor(context),
+                        vehiclePicker: RouteStartVehiclePicker.maybeFor(
+                          context,
+                        ),
                       ),
                     ),
                   );
@@ -215,7 +212,7 @@ class FullScreenMap extends StatelessWidget {
                 return Stack(
                   fit: StackFit.expand,
                   children: <Widget>[
-                    MapView(state: state, tileProvider: tileProvider),
+                    MapView(state: state, baseMap: baseMap),
                     // Top-left route readout (re-homed from the old Map tab —
                     // reads ONLY state.position + countryPercent; pure visualizer,
                     // AC-8/AC-12).
@@ -501,8 +498,8 @@ class _RouteReadout extends StatelessWidget {
 /// and the idle trace, where RED SOLID = voluntary idle and RED DASHED =
 /// lock/sleep idle (AC-9's non-colour cue, restated in words). The pattern +
 /// the text convey the cause WITHOUT relying on colour alone — the NFR-3
-/// colour-blind aid. Anchored bottom-left so it clears the OSM attribution
-/// (bottom-right) and the close button (top-right).
+/// colour-blind aid. Anchored bottom-left so it clears the CC BY-SA base-map
+/// attribution (bottom-right) and the close button (top-right).
 class _MapLegend extends StatelessWidget {
   const _MapLegend();
 

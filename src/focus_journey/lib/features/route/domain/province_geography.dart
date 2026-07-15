@@ -137,7 +137,13 @@ class ProvinceGeography {
 final ProvinceGeography vietnamProvinceGeography = ProvinceGeography(
   chain: vietnamProvinceChain,
   coordinates: const <String, GeoCoordinate>{
-    'mui_ca_mau': GeoCoordinate(latitude: 8.62, longitude: 104.72),
+    // Display alignment to the generalized bundled coastline: the true cape
+    // (~8.62, 104.72) sits ~800 m OFFSHORE of the simplified bundled outline, so
+    // the start pin / first segment / km=0 marker would render in the Gulf. This
+    // is a sub-1-km nudge (~0.95 km SSE) onto the drawn landmass so
+    // containsLandmass is true (AC-5/6/7); it is NOT a re-survey. The
+    // authoritative province-centre coordinate is re-derived in province-chain-2026.
+    'mui_ca_mau': GeoCoordinate(latitude: 8.613, longitude: 104.725),
     'can_tho': GeoCoordinate(latitude: 10.04, longitude: 105.78),
     'ho_chi_minh': GeoCoordinate(latitude: 10.82, longitude: 106.63),
     'da_lat': GeoCoordinate(latitude: 11.94, longitude: 108.44),
