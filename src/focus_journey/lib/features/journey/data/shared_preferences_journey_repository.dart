@@ -9,6 +9,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../reset/domain/local_data_store.dart';
 import '../domain/journey_progress.dart';
 import '../domain/journey_repository.dart';
 
@@ -18,7 +19,8 @@ import '../domain/journey_repository.dart';
 /// tiny). The pure [JourneyEngine] never sees this class — it depends only on
 /// the [JourneyRepository] interface (AC-11 / TC-018), so tests substitute an
 /// in-memory fake without touching real preferences.
-class SharedPreferencesJourneyRepository implements JourneyRepository {
+class SharedPreferencesJourneyRepository
+    implements JourneyRepository, LocalDataStore {
   /// Creates the repository over an existing [SharedPreferences] instance
   /// (inject it from app startup so loading is done once).
   SharedPreferencesJourneyRepository(this._prefs);
@@ -56,5 +58,15 @@ class SharedPreferencesJourneyRepository implements JourneyRepository {
   @override
   Future<void> save(JourneyProgress progress) async {
     await _prefs.setString(storageKey, jsonEncode(progress.toJson()));
+  }
+
+  // --- LocalDataStore (journey-reset AC-3) ---
+
+  @override
+  Set<String> get ownedKeys => const <String>{storageKey};
+
+  @override
+  Future<void> clear() async {
+    await _prefs.remove(storageKey);
   }
 }

@@ -7,6 +7,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../reset/domain/local_data_store.dart';
 import '../domain/day_stats.dart';
 import '../domain/stats_repositories.dart';
 
@@ -16,7 +17,8 @@ import '../domain/stats_repositories.dart';
 /// corrupt entry is dropped (degrade-safe) rather than crashing the whole load;
 /// a wholly-unreadable blob yields an empty history (fresh start), mirroring the
 /// established corrupt-blob-safe pattern (B-4).
-class SharedPreferencesHistoryRepository implements HistoryRepository {
+class SharedPreferencesHistoryRepository
+    implements HistoryRepository, LocalDataStore {
   /// Creates the repository over an existing [SharedPreferences] instance.
   SharedPreferencesHistoryRepository(this._prefs);
 
@@ -65,5 +67,15 @@ class SharedPreferencesHistoryRepository implements HistoryRepository {
       history.map((d) => d.toJson()).toList(growable: false),
     );
     await _prefs.setString(storageKey, encoded);
+  }
+
+  // --- LocalDataStore (journey-reset AC-3) ---
+
+  @override
+  Set<String> get ownedKeys => const <String>{storageKey};
+
+  @override
+  Future<void> clear() async {
+    await _prefs.remove(storageKey);
   }
 }

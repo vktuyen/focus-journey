@@ -6,6 +6,7 @@ library;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../reset/domain/local_data_store.dart';
 import '../domain/compact_window_position_repository.dart';
 import '../domain/window_position.dart';
 
@@ -13,7 +14,7 @@ import '../domain/window_position.dart';
 /// the v1 repository style (`SharedPreferences*Repository`). Only position is
 /// persisted (fixed size — AC-8).
 class SharedPreferencesCompactWindowPositionRepository
-    implements CompactWindowPositionRepository {
+    implements CompactWindowPositionRepository, LocalDataStore {
   /// Creates the repository over an existing [SharedPreferences] instance
   /// (built once at startup, as the v1 repositories are).
   const SharedPreferencesCompactWindowPositionRepository(this._prefs);
@@ -46,5 +47,18 @@ class SharedPreferencesCompactWindowPositionRepository
     } catch (_) {
       // Swallow — persistence is best-effort for a window position.
     }
+  }
+
+  // --- LocalDataStore (journey-reset AC-3 / AC-5 / TC-707) ---
+
+  @override
+  Set<String> get ownedKeys => const <String>{keyX, keyY};
+
+  @override
+  Future<void> clear() async {
+    // Both coordinate keys — so the compact window returns to its first-run
+    // default corner after a Factory reset (TC-707), not a stale position.
+    await _prefs.remove(keyX);
+    await _prefs.remove(keyY);
   }
 }

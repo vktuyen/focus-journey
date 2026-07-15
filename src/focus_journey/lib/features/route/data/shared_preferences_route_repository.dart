@@ -19,6 +19,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../reset/domain/local_data_store.dart';
 import '../domain/province_chain.dart';
 import '../domain/province_geography.dart';
 import '../domain/route_plan.dart';
@@ -34,7 +35,8 @@ import '../domain/route_selection.dart';
 /// resolver/cubit never sees this class — they depend only on [RouteRepository]
 /// (AC-9/AC-10), so tests substitute an in-memory fake without touching real
 /// preferences.
-class SharedPreferencesRouteRepository implements RouteRepository {
+class SharedPreferencesRouteRepository
+    implements RouteRepository, LocalDataStore {
   /// Creates the repository over an existing [SharedPreferences] instance, the
   /// [chain] used to rehydrate a persisted province id, and the [geography] used
   /// to rebuild a migrated legacy selection's sub-path. [geography] defaults to
@@ -105,6 +107,20 @@ class SharedPreferencesRouteRepository implements RouteRepository {
     await _prefs.setString(planStorageKey, jsonEncode(plan.toJson()));
     // Clear any stale legacy blob so a later loadPlan never re-migrates an old
     // selection over a freshly-saved plan (the v2 plan is authoritative).
+    await _prefs.remove(storageKey);
+  }
+
+  // --- LocalDataStore (journey-reset AC-3) ---
+
+  @override
+  Set<String> get ownedKeys => const <String>{planStorageKey, storageKey};
+
+  @override
+  Future<void> clear() async {
+    // Clear BOTH the v2 plan key AND the legacy v1 selection key (AC-3): the
+    // legacy key is the one most likely to be forgotten, so it is wiped
+    // explicitly here alongside the current one.
+    await _prefs.remove(planStorageKey);
     await _prefs.remove(storageKey);
   }
 

@@ -98,7 +98,7 @@ onboarding privacy claims pass a `privacy-guardian` audit with no API/dependency
   position; this slice does not re-implement geography.
 - **POV road scene** — `journey-view` (shipped).
 - **Tray / menu-bar / always-on-top mini-window** — v2 (`mini-window`).
-- **Cloud sync, accounts, leaderboards, push notifications** — no network in v1; leaderboard is v2.
+- **Cloud sync, accounts, leaderboards, push notifications** — no network; not planned (local single-user product).
   Notifications here are **local OS toasts only**.
 - **Per-mode speeds / energy** — v2 (`journey-energy-model`).
 - **Configurable streak threshold / per-mode goals** — v1 uses the locked 25-min raw-active rule and a

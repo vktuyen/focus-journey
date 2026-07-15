@@ -14,7 +14,6 @@ Developers, students, and remote workers struggle to stay motivated through long
 **Personas touched** (all currently placeholder in `docs/domain/personas.md`):
 - The focused individual (developer/student/remote worker) — wants motivation without being watched; success = sustained focus sessions and a sense of progress.
 - The privacy-skeptical teammate — will only adopt if the trust claim is verifiable; success = onboarding privacy claims match actual API usage.
-- (v2/v3 only) The team/leaderboard participant and the AI-coach recipient — named so v1 isn't designed in a way that blocks them.
 
 **Key edge cases to pin down at spec stage:**
 - **Sleep/wake:** on wake, idle is large → read as idle; the sleep gap counts as neither journey nor active time. Elapsed computed from last-tick timestamp, not an assumed interval.
@@ -105,8 +104,6 @@ Delivered as independently-shippable slices (wave discipline). Promote each with
 | 2 · v2 | mini-window | Always-on-top PiP + tray/menu-bar | [blocked by: journey-view] |
 | 2 · v2 | journey-energy-model | Per-mode speeds + energy/fuel strategy | [blocked by: journey-engine] |
 | 2 · v2 | map-geographic | `flutter_map` + real tiles | [blocked by: route-progress] |
-| 2 · v2 | team-leaderboard | Backend + team race (own sub-epic) | [blocked by: local-stats] |
-| 3 · v3 | ai-coach | Productivity-pattern coaching | [blocked by: local-stats] |
 | 3 · v3 | signed-distribution | Apple notarization + installers | — |
 
 ## Open questions (resolve at spec stage, not blocking Phase 0)

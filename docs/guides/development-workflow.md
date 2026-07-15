@@ -111,7 +111,9 @@ Copies `specs/_template/` → `specs/<slug>/` (just `spec.md` + `summary.html`) 
    the AC-ID(s) it covers**, with a short **Coverage note** at the top (which layers cover which ACs; risks).
    This replaces the old `test-plan.md`. It does not restate AC text.
 
-Also creates `planning/active/<slug>.md` with its **Phase ledger** (the single status tracker).
+Also creates `planning/active/<slug>.md` with its **Phase ledger** (the single status tracker), and
+**consumes** the backlog item — `planning/backlog/<slug>.md` is `git rm`'d, since the initiative has moved
+from CAPTURE into SPEC. An initiative lives in exactly one stage (backlog → active → done); no duplicates.
 
 | Artifact | Agent | Status field |
 |---|---|---|

@@ -16,5 +16,9 @@ Create a new feature spec folder. (For a small bug fix / tiny tweak, use `/quick
    (traceability), and a short coverage note at the top (which layers cover which ACs; what's risky or
    under-covered). It does **not** restate the ACs or write a separate test-plan file.
 5. Add `planning/active/$ARGUMENTS.md` from the active template (single Phase ledger — no separate status log).
+6. **Consume the backlog item (move, don't duplicate).** If `planning/backlog/$ARGUMENTS.md` exists, `git rm`
+   it now — it has been promoted into `planning/active/`, and its domain framing / feasibility notes already
+   fed the spec in steps 2-4. An initiative lives in exactly **one** stage (backlog → active → done); never
+   leave a copy behind in `backlog/`. (Epic umbrella docs are not per-slug items and stay in `backlog/`.)
 
 Do NOT start implementation until steps 1-4 are done and I've set `spec.md` `Status: approved`.
