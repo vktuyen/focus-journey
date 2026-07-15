@@ -121,7 +121,10 @@ flutter:
     # location-map frame + georeferencing bounds as before. The pre-2025
     # 63-province files (vietnam_provinces[_base].svg) are retained but SUPERSEDED
     # (historical). See CREDITS.md for bounds/projection used to place overlays.
-    - assets/map/
+    # Only the runtime GeoJSON is bundled — the source SVGs in assets/map/ (input
+    # to tool/svg_to_geojson.py) stay in the repo but are kept OUT of the app
+    # bundle to avoid ~2.7 MB of dead weight (map-bundle-weight, 2026-07-15).
+    - assets/map/vietnam_provinces_2025.geojson
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
