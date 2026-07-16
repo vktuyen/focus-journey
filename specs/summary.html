@@ -49,6 +49,8 @@
     --shadow-medium: 0 4px 12px rgba(0,0,0,0.12);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  section { scroll-margin-top: 64px; }
   body {
     background: var(--bg); color: var(--text-strong);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -229,6 +231,52 @@
   footer .pipe { color: #8FB6BF; }
   footer strong { color: var(--yellow); }
 
+  /* ─── SLUG ACCORDION (presentation view) ─── */
+  .wave-divider { display:flex; align-items:center; gap:12px; margin:28px 0 12px; }
+  .wave-divider:first-child { margin-top:4px; }
+  .wave-divider .wd-name { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--primary-pressed); white-space:nowrap; }
+  .wave-divider .wd-count { font-size:11px; font-weight:700; color:var(--text-weak); background:var(--surface-03); border:1px solid var(--border-weak); border-radius:20px; padding:2px 10px; white-space:nowrap; }
+  .wave-divider .wd-rule { flex:1; height:1px; background:var(--border-weak); }
+  .acc-controls { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .acc-btn { cursor:pointer; font-size:12px; font-weight:700; color:var(--primary-pressed); background:var(--primary-subtle); border:1px solid var(--border-primary-subtle); border-radius:20px; padding:6px 15px; }
+  .acc-btn:hover { background:#d3edef; }
+  /* collapsible slug-card */
+  .slug-card .sc-head { cursor:pointer; user-select:none; }
+  .slug-card .sc-head:hover .sc-title { color:var(--primary); }
+  .slug-card .sc-chevron { display:inline-block; transition:transform .18s ease; color:var(--text-weak); font-size:11px; margin-right:7px; }
+  .slug-card.collapsed .sc-chevron { transform:rotate(-90deg); }
+  .slug-card.collapsed .sc-head { margin-bottom:0; }
+  .sc-head-right { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .sc-head-right .sa-meta { display:inline-flex; align-items:center; gap:10px; font-size:12.5px; font-weight:800; color:var(--text-medium); white-space:nowrap; }
+  .sc-head-right .sa-meta .sa-ac { color:var(--primary); }
+  .slug-card.collapsed .sc-desc,
+  .slug-card.collapsed .sc-stats,
+  .slug-card.collapsed .ac-totals,
+  .slug-card.collapsed .tags { display:none; }
+  /* per-slug detail — one toggle for all report cards */
+  details.detail-wrap { margin-top:4px; }
+  details.detail-wrap > summary { cursor:pointer; list-style:none; font-size:13.5px; font-weight:700; color:var(--primary-pressed); background:var(--surface-02); border:1px solid var(--border-weak); border-radius:10px; padding:13px 16px; display:flex; align-items:center; gap:9px; }
+  details.detail-wrap > summary::-webkit-details-marker { display:none; }
+  details.detail-wrap > summary::before { content:'▸'; transition:transform .18s ease; color:var(--text-weak); font-size:12px; }
+  details.detail-wrap[open] > summary::before { transform:rotate(90deg); }
+  details.detail-wrap > summary:hover { background:var(--surface-03); }
+  details.detail-wrap .dw-body { margin-top:16px; }
+
+  /* ─── RETROSPECTIVE ─── */
+  .retro-lead { background:var(--primary-subtle); border:1px solid var(--border-primary-subtle); border-left:3px solid var(--primary); border-radius:var(--radius); padding:16px 20px; font-size:14px; color:var(--text-medium); margin-bottom:22px; }
+  .retro-lead strong { color:var(--primary-pressed); }
+  .retro-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:760px){ .retro-grid{ grid-template-columns:1fr; } }
+  .retro-col { background:var(--surface-01); border:1px solid var(--border-weak); border-radius:var(--radius); box-shadow:var(--shadow-weak); padding:20px 22px; }
+  .retro-col.cons { border-top:3px solid var(--negative); }
+  .retro-col.fix { border-top:3px solid var(--positive); }
+  .retro-col h3 { margin-bottom:14px; font-size:15px; color:var(--lake-blue); }
+  .retro-list { display:flex; flex-direction:column; gap:14px; }
+  .retro-item { font-size:13.5px; color:var(--text-medium); line-height:1.5; }
+  .retro-item strong { color:var(--text-strong); display:block; margin-bottom:2px; }
+  .retro-metric { display:inline-block; font-family:monospace; font-size:11px; font-weight:700; color:var(--negative); background:var(--negative-bg); border:1px solid var(--negative-border); border-radius:6px; padding:1px 7px; margin-top:5px; }
+  .retro-col.fix .retro-metric { color:var(--positive); background:var(--positive-bg); border-color:var(--positive-border); }
+
   @media (max-width: 640px) {
     nav { padding: 10px 16px; gap: 14px; }
     .hero { padding: 48px 16px 40px; }
@@ -248,6 +296,7 @@
   <a href="#slugs">Slugs</a>
   <a href="#rules">Domain Knowledge</a>
   <a href="#tests">Test Results</a>
+  <a href="#retro">Retrospective</a>
 </nav>
 
 <!-- HERO -->
@@ -545,8 +594,15 @@
 <!-- SLUGS -->
 <section id="slugs">
   <h2>Slugs <span>— 20 in this epic</span></h2>
-  <p class="section-sub">In build order: the <code>journey-engine</code> core, the rest of the v1 MVP, the v2 feature wave, the visual-polish epic, then the <code>refine-app-ui-ux</code> wave (Vietnam-2026 map + real-road route + reset). Every slug is shipped and green.</p>
+  <p class="section-sub">Grouped by delivery wave; every slug is shipped and green. <strong>Click any row to expand it</strong> — collapsed by default so the whole build fits on one screen.</p>
+  <div class="acc-controls">
+    <span class="acc-btn" id="accExpand">▾ Expand all</span>
+    <span class="acc-btn" id="accCollapse">▸ Collapse all</span>
+  </div>
   <div class="slug-cards">
+
+    <div class="wave-divider"><span class="wd-name">Wave 1 · v1 MVP</span><span class="wd-count">5 slugs</span><span class="wd-rule"></span></div>
+
 
     <div class="slug-card">
       <div class="top-bar shipped"></div>
@@ -664,6 +720,8 @@
         </div>
       </div>
     </div>
+
+    <div class="wave-divider"><span class="wd-name">Wave 2 · v2 feature wave</span><span class="wd-count">6 slugs</span><span class="wd-rule"></span></div>
 
     <div class="slug-card">
       <div class="top-bar shipped"></div>
@@ -806,6 +864,8 @@
       </div>
     </div>
 
+    <div class="wave-divider"><span class="wd-name">Wave 3 · visual-polish epic</span><span class="wd-count">4 slugs</span><span class="wd-rule"></span></div>
+
     <div class="slug-card">
       <div class="top-bar shipped"></div>
       <div class="sc-body">
@@ -898,6 +958,8 @@
         </div>
       </div>
     </div>
+
+    <div class="wave-divider"><span class="wd-name">Wave 4 · refine-app-ui-ux</span><span class="wd-count">5 slugs</span><span class="wd-rule"></span></div>
 
     <div class="slug-card">
       <div class="top-bar shipped"></div>
@@ -1140,6 +1202,9 @@
 
   <!-- (B) Per-slug detail -->
   <h3 style="margin:32px 0 14px;">Per-slug detail</h3>
+  <details class="detail-wrap">
+    <summary>Show all 20 per-slug test reports</summary>
+    <div class="dw-body">
 
   <div class="report-card">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
@@ -1476,6 +1541,41 @@
     </table>
   </div>
 
+    </div>
+  </details>
+</section>
+
+<!-- RETROSPECTIVE -->
+<section id="retro">
+  <h2>Retrospective <span>— what to improve</span></h2>
+  <p class="section-sub">An honest read of the agentic process that built these 20 slugs — where it costs speed and quality, and the highest-payoff fixes. Numbers are from the repo's own usage telemetry and artifacts.</p>
+
+  <div class="retro-lead">One-line diagnosis: <strong>a big-team audit process is running a solo project</strong> — it optimises for traceability and ceremony over throughput and depth. The build works and ships green, but each feature costs ~$55 and moves through six manual phases, and "green" hides 21 acceptance criteria that were never actually verified.</div>
+
+  <div class="retro-grid">
+    <div class="retro-col cons">
+      <h3>🔻 Cons &amp; downsides (why it's slow / average)</h3>
+      <div class="retro-list">
+        <div class="retro-item"><strong>Context is re-read, not reused.</strong>Six phases, each a separate session whose sub-agents re-read the spec + architecture + domain docs cold. For every token of real output, 171 were reprocessed.<span class="retro-metric">cache-read : output = 171 : 1</span></div>
+        <div class="retro-item"><strong>Six sequential manual gates per feature.</strong>capture → new-feature → implement → review → test → ship. Only spec-signoff and green+review add safety; the other four session boundaries add wall-clock + cost.<span class="retro-metric">~$55 / slug · 6 commands each</span></div>
+        <div class="retro-item"><strong>Verification is shallow-but-late; volume masks rigor.</strong>One review pass, no adversarial multi-lens or property-based tests on the pure domain, and many ACs deferred to "manual on-device" then forgotten.<span class="retro-metric">21 / 330 ACs never verified</span></div>
+        <div class="retro-item"><strong>Feedback arrives at the end → expensive rework.</strong>route-real-road alone had 2 wrong route-model iterations, a phantom marker bug, and 6 review fixes applied after build — the human only sees results in Phase 3+.<span class="retro-metric">1 session spiked to $322</span></div>
+        <div class="retro-item"><strong>Ceremony inflation.</strong>Prose-heavy ledgers that duplicate git history, 9 ADRs for a solo desktop app, and ~1,200 lines of process instructions to hand-maintain (itself a drift source).<span class="retro-metric">test:code LOC = 1.8 : 1</span></div>
+        <div class="retro-item"><strong>No parallelism.</strong>Independent slugs in a wave run strictly serially through all six phases.</div>
+      </div>
+    </div>
+    <div class="retro-col fix">
+      <h3>🔼 How to improve (ranked by payoff)</h3>
+      <div class="retro-list">
+        <div class="retro-item"><strong>① Keep context warm.</strong>Run implement → review → test in one session, or hand sub-agents a pre-digested context pack (ACs + the 3–5 relevant files) instead of "go re-read docs/".<span class="retro-metric">target ~3–5× cheaper &amp; faster</span></div>
+        <div class="retro-item"><strong>② Collapse phases for the common case.</strong>One orchestrator, pausing at exactly two human checkpoints (spec approved, ship). Widen the proven /quick-change lane.</div>
+        <div class="retro-item"><strong>③ Add a cheap design/preview checkpoint before full build.</strong>A mock or spike the human reacts to in minutes — kills the late-feedback rework, especially for UI/UX.</div>
+        <div class="retro-item"><strong>④ Trade test volume for targeted verification.</strong>Property-based tests on the pure domain, adversarial multi-lens review, and either close the 21 deferred on-device ACs or stop calling them ACs.</div>
+        <div class="retro-item"><strong>⑤ Trim the process surface.</strong>Status = one line + git link, not prose essays. ADRs only for cross-cutting calls. Consolidate overlapping commands/agents.</div>
+        <div class="retro-item"><strong>⑥ Parallelise independent slugs &amp; right-size effort.</strong>Git worktrees for concurrent slugs; a cheap/fast model for mechanical work, deep reasoning reserved for design + review.</div>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- FOOTER -->
@@ -1503,6 +1603,49 @@
       });
     }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 });
     sections.forEach(function (s) { obs.observe(s); });
+  })();
+</script>
+
+<script>
+  // Slug accordion: compact one-row-per-slug, collapsed by default, expand on click.
+  (function () {
+    var cards = document.querySelectorAll('.slug-card');
+    cards.forEach(function (card) {
+      var head = card.querySelector('.sc-head');
+      if (!head) return;
+      var titleDiv = card.querySelector('.sc-title');
+      var badge = head.querySelector('.status-badge');
+      var stats = card.querySelectorAll('.sc-stat .n');
+      var ac = stats.length ? stats[0].textContent.trim() : '';
+      if (titleDiv && !titleDiv.querySelector('.sc-chevron')) {
+        var chev = document.createElement('span');
+        chev.className = 'sc-chevron';
+        chev.textContent = '▾';
+        titleDiv.insertBefore(chev, titleDiv.firstChild);
+      }
+      if (badge && !head.querySelector('.sc-head-right')) {
+        var right = document.createElement('div');
+        right.className = 'sc-head-right';
+        if (ac) {
+          var meta = document.createElement('span');
+          meta.className = 'sa-meta';
+          meta.innerHTML = '<span class="sa-ac">' + ac + ' ACs</span><span>🟢</span>';
+          right.appendChild(meta);
+        }
+        badge.parentNode.removeChild(badge);
+        right.appendChild(badge);
+        head.appendChild(right);
+      }
+      card.classList.add('collapsed');
+      head.addEventListener('click', function () { card.classList.toggle('collapsed'); });
+    });
+    function setAll(collapsed) {
+      cards.forEach(function (c) { c.classList.toggle('collapsed', collapsed); });
+    }
+    var ex = document.getElementById('accExpand');
+    var co = document.getElementById('accCollapse');
+    if (ex) ex.addEventListener('click', function () { setAll(false); });
+    if (co) co.addEventListener('click', function () { setAll(true); });
   })();
 </script>
 </body>
