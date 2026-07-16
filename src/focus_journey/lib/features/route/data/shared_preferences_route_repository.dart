@@ -20,6 +20,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../reset/domain/local_data_store.dart';
+import '../domain/coastal_corridor.dart';
+import '../domain/journey_direction.dart';
 import '../domain/province_chain.dart';
 import '../domain/province_geography.dart';
 import '../domain/route_plan.dart';
@@ -87,19 +89,20 @@ class SharedPreferencesRouteRepository
   }
 
   @override
-  Future<RoutePlan?> loadPlan() async {
+  Future<RoutePlan?> loadPlan({double currentCumulativeKm = 0}) async {
     // Prefer the v2 plan blob when present.
     final rawPlan = _prefs.getString(planStorageKey);
     if (rawPlan != null) {
-      final plan = _tryDecodePlan(rawPlan);
-      // A corrupt v2 blob falls through to "no saved route" (null) per the
-      // FormatException → null contract — it does NOT fall back to the legacy
-      // key (a written v2 blob supersedes any legacy one).
-      return plan;
+      // A corrupt v2 blob → "no saved route" (null); a structurally-valid plan
+      // whose ids are RETIRED (no longer in the 34-unit chain) → migrate by
+      // reset (AC-9); an in-chain plan → return as-is. It does NOT fall back to
+      // the legacy key (a written v2 blob supersedes any legacy one).
+      return await _decodePlanOrMigrate(rawPlan, currentCumulativeKm);
     }
     // No v2 blob: migrate a legacy RouteSelection blob forward (ADR-0005
-    // decision 4). An in-flight v1 route is preserved across the upgrade.
-    return _migrateLegacy();
+    // decision 4). An in-flight v1 route is preserved across the upgrade; a
+    // legacy blob with retired ids migrates by reset (AC-9).
+    return _migrateLegacy(currentCumulativeKm);
   }
 
   @override
@@ -124,44 +127,102 @@ class SharedPreferencesRouteRepository
     await _prefs.remove(storageKey);
   }
 
-  /// Decodes a v2 [RoutePlan] blob, returning `null` on any corrupt/unreadable
-  /// data (the FormatException → null contract, mirrors [load]).
-  RoutePlan? _tryDecodePlan(String raw) {
+  /// Decodes a v2 [RoutePlan] blob and, when its ids are retired, migrates it by
+  /// reset (AC-9). Returns:
+  ///   - the decoded plan when its ids resolve against the current chain;
+  ///   - a fresh coastal-corridor reset plan (stamped at [currentCumulativeKm]) when
+  ///     the blob is a STRUCTURALLY-valid plan whose ids are RETIRED (no longer
+  ///     in the 34-unit chain) — the `toResolved` `ArgumentError` is the
+  ///     "retired-but-recognisable" signal;
+  ///   - `null` when the blob is genuinely corrupt/undecodable (the
+  ///     FormatException → null contract, mirrors [load]).
+  Future<RoutePlan?> _decodePlanOrMigrate(
+    String raw,
+    double currentCumulativeKm,
+  ) async {
+    final RoutePlan plan;
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) {
         return null;
       }
-      final plan = RoutePlan.fromJson(decoded);
-      // Validate the ids rebuild a real sub-path against the chain (a plan whose
-      // ids are no longer in the chain is unreadable → "no saved route").
-      plan.toResolved(_chain, _geography);
-      return plan;
+      // A structurally-valid plan (right shape, ≥2 string ids, numeric offset,
+      // known lifecycle). Corrupt structure throws FormatException/TypeError.
+      plan = RoutePlan.fromJson(decoded);
     } on FormatException {
-      return null;
-    } on ArgumentError {
       return null;
     } on TypeError {
       return null;
     }
-  }
-
-  /// Migrates a legacy [RouteSelection] blob forward to a [RoutePlan] (ADR-0005
-  /// decision 4): rebuild the FULL sub-path from the selection's start to its
-  /// direction's tip (the shipped semantics) and synthesise the ordered ids, with
-  /// `completed:true → lifecycle:completed`, else `active`. A blob that is neither
-  /// a valid plan nor a valid legacy selection is "no saved route" (`null`).
-  Future<RoutePlan?> _migrateLegacy() async {
-    final legacy = await load();
-    if (legacy == null) {
-      return null;
+    // A RETIRED id (structurally valid, but the id is no longer a node of the
+    // current 34-unit chain) is the "recognisable → reset" signal (AC-9). This
+    // is checked BEFORE toResolved so a plan whose ids ARE all in the chain but
+    // are otherwise malformed (e.g. non-monotonic) still degrades to null
+    // (corrupt), not a reset.
+    final chainIds = <String>{for (final node in _chain.nodes) node.id};
+    final hasRetiredId = plan.orderedNodeIds.any(
+      (id) => !chainIds.contains(id),
+    );
+    if (hasRetiredId) {
+      return _resetAndPersist(currentCumulativeKm);
     }
     try {
-      // The full sub-path from the legacy start to its direction's destination
-      // tip — exactly the shipped fixed-start + direction route.
+      // Ids all resolve; they must also rebuild a real monotonic sub-path.
+      plan.toResolved(_chain, _geography);
+      return plan;
+    } on ArgumentError {
+      // In-chain ids but not a valid sub-path (e.g. non-monotonic) → corrupt →
+      // "no saved route" (null), NOT a reset.
+      return null;
+    }
+  }
+
+  /// Migrates a legacy [RouteSelection] blob forward (ADR-0005 decision 4 / AC-9).
+  ///
+  /// - A legacy blob whose `startId` still resolves against the current chain is
+  ///   rebuilt as the full start→tip sub-path (the shipped semantics), with
+  ///   `completed:true → lifecycle:completed`, else `active`.
+  /// - A STRUCTURALLY-valid legacy blob whose `startId` is RETIRED (not in the
+  ///   34-unit chain) is forward-migrated **by reset** to a fresh coastal-corridor
+  ///   active plan stamped at [currentCumulativeKm] (AC-9) — not dropped.
+  /// - A blob that is neither → "no saved route" (`null`).
+  Future<RoutePlan?> _migrateLegacy(double currentCumulativeKm) async {
+    final raw = _prefs.getString(storageKey);
+    if (raw == null) {
+      return null;
+    }
+    // Decode the raw legacy blob independently of the chain so a RETIRED-id
+    // selection is distinguishable from a corrupt one (`load()` folds both into
+    // null via FormatException). A blob that is a well-formed selection whose id
+    // is simply not in the current chain is "recognisable → reset".
+    final Map<String, dynamic> decoded;
+    try {
+      final json = jsonDecode(raw);
+      if (json is! Map<String, dynamic>) {
+        return null;
+      }
+      decoded = json;
+    } on FormatException {
+      return null;
+    }
+    if (!_isRecognisableLegacySelection(decoded)) {
+      return null; // genuinely corrupt/unrecognisable → no saved route.
+    }
+    final startId = decoded['startId'] as String;
+    final startMatches = _chain.nodes.where((p) => p.id == startId);
+    if (startMatches.isEmpty) {
+      // Recognisable legacy selection but a retired start id → reset (AC-9).
+      return _resetAndPersist(currentCumulativeKm);
+    }
+
+    // The start still exists in the current chain: rebuild the shipped full
+    // start→tip sub-path (the pre-existing migration path).
+    final legacy = RouteSelection.fromJson(decoded, _chain);
+    try {
       final end = _chain.destinationOf(legacy.start, legacy.direction);
       // Defensive: an off-direction tip legacy blob (start already at the tip)
-      // would be zero-length — treat it as "no saved route" rather than crash.
+      // would be zero-length — treat it as "no saved route" (the start still
+      // exists in the current chain, so this is not the retired-id reset case).
       if (end == legacy.start) {
         return null;
       }
@@ -181,5 +242,61 @@ class SharedPreferencesRouteRepository
     } on ArgumentError {
       return null;
     }
+  }
+
+  /// Whether [decoded] is a STRUCTURALLY-valid legacy `RouteSelection` blob
+  /// (the shipped `RouteSelection.toJson` shape): a string `startId`, a known
+  /// [JourneyDirection] name, a numeric offset, and a bool `completed`. Used to
+  /// tell a retired-id selection (→ reset) from a corrupt blob (→ null) — the
+  /// chain membership of `startId` is checked separately by the caller.
+  bool _isRecognisableLegacySelection(Map<String, dynamic> decoded) {
+    final startId = decoded['startId'];
+    if (startId is! String || startId.isEmpty) {
+      return false;
+    }
+    final directionName = decoded['direction'];
+    final knownDirection = JourneyDirection.values.any(
+      (d) => d.name == directionName,
+    );
+    if (!knownDirection) {
+      return false;
+    }
+    if (decoded['routeStartOffsetKm'] is! num) {
+      return false;
+    }
+    if (decoded['completed'] is! bool) {
+      return false;
+    }
+    return true;
+  }
+
+  /// A fresh **coastal-corridor active** [RoutePlan] — the default route (route-
+  /// real-road / AC-1): the south→north coastal sweep from Cà Mau to Cao Bằng
+  /// with the deep-inland units removed ([coastalCorridorNodeIds]), NOT the all-34
+  /// tour. Stamped at [currentCumulativeKm] (the engine's current never-reset
+  /// cumulative — BR-8). This is the migration-by-reset target (AC-9): the
+  /// traveller resumes at the same lifetime distance, only re-based onto the
+  /// default corridor — never an id-remap.
+  RoutePlan _resetPlan(double currentCumulativeKm) {
+    return RoutePlan(
+      orderedNodeIds: coastalCorridorNodeIds(_chain),
+      routeStartOffsetKm: currentCumulativeKm < 0 ? 0 : currentCumulativeKm,
+      lifecycle: RouteLifecycle.active,
+    );
+  }
+
+  /// Builds the migration-by-reset plan AND persists it (S3 — deterministic
+  /// startup): [savePlan] writes the fresh coastal-corridor plan under [planStorageKey]
+  /// (overwriting the retired/legacy blob that triggered the reset) and clears
+  /// the stale [storageKey], so a SUBSEQUENT [loadPlan] reads the migrated
+  /// in-chain plan directly and the reset runs exactly ONCE — not on every launch
+  /// until the user next saves. Idempotent (re-running yields the same plan) and
+  /// crash-safe (a failed/partial write just re-triggers the same reset next
+  /// launch — never corruption). Does NOT touch the never-reset cumulative store
+  /// (BR-8): [currentCumulativeKm] is only read, never written here.
+  Future<RoutePlan> _resetAndPersist(double currentCumulativeKm) async {
+    final plan = _resetPlan(currentCumulativeKm);
+    await savePlan(plan);
+    return plan;
   }
 }

@@ -9,7 +9,9 @@ library;
 
 import 'package:equatable/equatable.dart';
 
+import '../domain/province.dart';
 import '../domain/province_geography.dart';
+import '../domain/road_route.dart';
 import '../domain/route_position.dart';
 import '../domain/route_selection.dart';
 
@@ -36,6 +38,9 @@ class RouteViewState extends Equatable {
     required this.cumulativeDistanceKm,
     this.subGeography,
     this.countryPercent,
+    this.markedStopIds = const <String>[],
+    this.roadRoute,
+    this.waypoints = const <Province>[],
   });
 
   /// The pre-selection default: no route chosen yet, zero cumulative distance.
@@ -44,6 +49,9 @@ class RouteViewState extends Equatable {
       position = null,
       subGeography = null,
       countryPercent = null,
+      markedStopIds = const <String>[],
+      roadRoute = null,
+      waypoints = const <Province>[],
       cumulativeDistanceKm = 0;
 
   /// The active route selection (over the sub-chain for v2), or `null` when none
@@ -66,6 +74,23 @@ class RouteViewState extends Equatable {
   /// capture the next route's offset when the user starts a new journey).
   final double cumulativeDistanceKm;
 
+  /// The user's marked-stop ids for the active v2 plan (route-real-road / AC-4),
+  /// forwarded so the map cubit can emphasize them as big markers. Empty on the
+  /// legacy full-chain path and for a default/migrated full-spine plan (AC-3).
+  final List<String> markedStopIds;
+
+  /// The route drawn along the REAL BUNDLED ROAD (route-real-road / AC-2): the
+  /// bundled highway sub-path between the snapped waypoints. `null` when no road
+  /// asset is injected (legacy chain path / tests) — the map then falls back to
+  /// the chain projector. When present it is the authoritative drawn geometry AND
+  /// the route-length axis: `position.fractionAlongRoute` is the road fraction.
+  final RoadRoute? roadRoute;
+
+  /// The ordered waypoint provinces (start, user stops…, end) — aligned by index
+  /// with `roadRoute.waypointCoordinates`. The ONLY markers drawn (Google-style —
+  /// AC-3): no per-province dots. Empty on the legacy path.
+  final List<Province> waypoints;
+
   /// Whether a route is active (a selection has been made).
   bool get hasRoute => selection != null && position != null;
 
@@ -79,5 +104,8 @@ class RouteViewState extends Equatable {
     subGeography,
     countryPercent,
     cumulativeDistanceKm,
+    markedStopIds,
+    roadRoute,
+    waypoints,
   ];
 }

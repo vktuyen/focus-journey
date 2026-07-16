@@ -44,12 +44,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'features/activity/data/activity_plugin_factory.dart';
 import 'features/activity/data/mock_activity_source.dart';
 import 'features/activity/domain/activity_plugin.dart';
+import 'features/journey/data/shared_preferences_journey_repository.dart';
 import 'features/journey/domain/clock.dart';
 import 'features/journey/domain/journey_engine.dart';
 import 'features/journey/domain/journey_progress.dart';
+import 'features/journey/domain/journey_repository.dart';
 import 'features/journey/presentation/activity_ticker.dart';
 import 'features/journey/presentation/game/journey_game.dart';
 import 'features/journey/presentation/journey_cubit.dart';
+import 'features/journey/presentation/journey_gate_cubit.dart';
 import 'features/journey/presentation/journey_screen.dart';
 import 'features/journey/presentation/journey_view_state.dart';
 import 'features/mini_window/data/mini_window_factory.dart';
@@ -70,10 +73,13 @@ import 'features/reset/presentation/launch_prompt.dart';
 import 'features/window_visibility/data/window_visibility_factory.dart';
 import 'features/window_visibility/domain/window_visibility_controller.dart';
 import 'features/route/data/base_map_repository.dart';
+import 'features/route/data/road_path_repository.dart';
 import 'features/route/data/shared_preferences_route_repository.dart';
 import 'features/route/domain/base_map_geometry.dart';
 import 'features/route/domain/province_chain.dart';
 import 'features/route/domain/province_geography.dart';
+import 'features/route/domain/road_path.dart';
+import 'features/route/domain/road_route.dart';
 import 'features/route/domain/route_plan.dart';
 import 'features/route/domain/route_repository.dart';
 import 'features/route/presentation/map_cubit.dart';
@@ -107,6 +113,12 @@ Future<void> main() async {
   // the empty base (the map degrades to overlays-on-sea rather than crashing).
   final baseMap = await _loadBaseMap();
 
+  // route-real-road (AC-1): load + parse the bundled national-road GeoJSON ONCE
+  // at startup (a bundled static asset — no network, no location; NFR-2/NFR-4).
+  // Parse failure must never block launch, so fall back to null (the map degrades
+  // to the chain-projected route rather than crashing).
+  final roadPath = await _loadRoadPath();
+
   // Register the local-notifier dep (privacy-clean — local OS toasts only, no
   // network). `setup` is required before any toast is shown. launch_at_startup
   // is configured in FocusJourneyApp.initState with the executable path.
@@ -120,6 +132,10 @@ Future<void> main() async {
     vietnamProvinceChain,
     vietnamProvinceGeography,
   );
+  // The engine's never-reset cumulative store (BR-8). Read at load to stamp a
+  // migrated-by-reset plan at the current lifetime distance (province-chain-2026
+  // AC-9); also the wipe seam registered in `buildResetService`.
+  final journeyRepository = SharedPreferencesJourneyRepository(prefs);
   final settingsRepository = SharedPreferencesSettingsRepository(prefs);
   final historyRepository = SharedPreferencesHistoryRepository(prefs);
   final earnedBadgesRepository = SharedPreferencesEarnedBadgesRepository(prefs);
@@ -149,7 +165,9 @@ Future<void> main() async {
   runApp(
     FocusJourneyApp(
       baseMap: baseMap,
+      roadPath: roadPath,
       routeRepository: routeRepository,
+      journeyRepository: journeyRepository,
       settingsRepository: settingsRepository,
       historyRepository: historyRepository,
       earnedBadgesRepository: earnedBadgesRepository,
@@ -181,6 +199,21 @@ Future<BaseMapGeometry> _loadBaseMap() async {
   }
 }
 
+/// Loads the bundled national-road geometry (route-real-road / AC-1). A parse/read
+/// failure must never block launch, so it degrades to `null` (the map falls back
+/// to the chain-projected route) rather than crashing.
+Future<RoadPath?> _loadRoadPath() async {
+  try {
+    return await AssetRoadPathRepository().load();
+  } catch (error, stack) {
+    debugPrint(
+      'Failed to load bundled road path "$kRoadPathAssetPath"; falling back to '
+      'the chain-projected route. Error: $error\n$stack',
+    );
+    return null;
+  }
+}
+
 /// Root of the Vietnam Focus Journey app. The STABLE composition layer: it owns
 /// the long-lived native controllers, the persistence seams, and the Factory
 /// reset seam — all of which survive a Factory reset — and hosts the
@@ -189,7 +222,9 @@ class FocusJourneyApp extends StatefulWidget {
   /// Creates the app root with the injected persistence + native seams.
   const FocusJourneyApp({
     required this.baseMap,
+    required this.roadPath,
     required this.routeRepository,
+    required this.journeyRepository,
     required this.settingsRepository,
     required this.historyRepository,
     required this.earnedBadgesRepository,
@@ -207,8 +242,20 @@ class FocusJourneyApp extends StatefulWidget {
   /// reconstructable in-memory graph).
   final BaseMapGeometry baseMap;
 
+  /// The bundled national-road geometry (route-real-road / AC-1). A long-lived
+  /// static asset loaded once at startup; the route is drawn along it and the
+  /// engine's pace is derived from its length. `null` if the asset failed to load
+  /// (the route degrades to the chain-projected polyline). Survives a Factory
+  /// reset (not part of the reconstructable in-memory graph).
+  final RoadPath? roadPath;
+
   /// The route persistence seam (used to re-read state after a reset too).
   final RouteRepository routeRepository;
+
+  /// The engine's cumulative-progress seam (BR-8's never-reset store). Read at
+  /// load to stamp a migrated-by-reset plan at the current lifetime distance
+  /// (province-chain-2026 AC-9). Not otherwise touched by the plan migration.
+  final JourneyRepository journeyRepository;
 
   /// The settings persistence seam.
   final SettingsRepository settingsRepository;
@@ -282,7 +329,16 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
   /// Replaces `main()`'s inline loads. `_loaded` gates a one-frame splash so the
   /// first paint is never a flash of an un-restored route.
   Future<void> _loadPersistedState({required bool firstRun}) async {
-    final plan = await widget.routeRepository.loadPlan();
+    // Read the engine's current cumulative (BR-8 never-reset store) BEFORE the
+    // plan so a plan/selection with retired pre-2025 ids can be migrated by
+    // reset (province-chain-2026 AC-9): the fresh full-spine plan is stamped at
+    // this lifetime distance, re-basing the traveller onto the new 34-unit spine
+    // without touching the cumulative store itself.
+    final progress = await widget.journeyRepository.load();
+    final currentCumulativeKm = progress?.distanceKm ?? 0;
+    final plan = await widget.routeRepository.loadPlan(
+      currentCumulativeKm: currentCumulativeKm,
+    );
     final settings = await widget.settingsRepository.load();
     final hint = await widget.hideToTrayHintRepository.hasShownHint();
     if (!mounted) {
@@ -357,6 +413,7 @@ class _FocusJourneyAppState extends State<FocusJourneyApp> {
                 key: ValueKey<int>(_generation),
                 clock: _clock,
                 baseMap: widget.baseMap,
+                roadPath: widget.roadPath,
                 routeRepository: widget.routeRepository,
                 settingsRepository: widget.settingsRepository,
                 historyRepository: widget.historyRepository,
@@ -394,6 +451,7 @@ class _JourneyRuntime extends StatefulWidget {
   const _JourneyRuntime({
     required this.clock,
     required this.baseMap,
+    required this.roadPath,
     required this.routeRepository,
     required this.settingsRepository,
     required this.historyRepository,
@@ -410,6 +468,7 @@ class _JourneyRuntime extends StatefulWidget {
 
   final Clock clock;
   final BaseMapGeometry baseMap;
+  final RoadPath? roadPath;
   final RouteRepository routeRepository;
   final SettingsRepository settingsRepository;
   final HistoryRepository historyRepository;
@@ -436,6 +495,12 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
   late final AppShellCubit _shellCubit;
   late final LaunchGateCubit _launchGateCubit;
 
+  // route-real-road: the explicit Start gate. Holds an in-memory running flag
+  // (NOT persisted — always paused on launch). The runtime LISTENS to it and is
+  // the only thing that starts/stops the ticker; the pure engine is untouched.
+  late final JourneyGateCubit _gateCubit;
+  StreamSubscription<bool>? _gateSub;
+
   // mini-window slice subscriptions (tray actions, journey→tray, close→hint).
   StreamSubscription<TrayAction>? _trayActionsSub;
   StreamSubscription<JourneyViewState>? _journeyToTraySub;
@@ -459,14 +524,22 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
     );
 
     _cubit = JourneyCubit();
+    // route-real-road: the Start gate. Created BEFORE the route cubit so its
+    // `onRouteStarted` hook can open the gate on confirm. Starts PAUSED.
+    _gateCubit = JourneyGateCubit();
     // route-planner-v2 (ADR-0005): the route cubit holds the FULL chain +
     // geography and derives the active plan's SUB-CHAIN. A restored active/
     // completed plan seeds it (AC-12). After a Factory reset, savedPlan is null.
     _routeCubit = RouteProgressCubit(
       chain: vietnamProvinceChain,
       geography: vietnamProvinceGeography,
+      road: widget.roadPath,
       repository: widget.routeRepository,
       initialPlan: widget.savedPlan,
+      // Confirming a NEW route (planner "Start journey" / abandon-and-start) is
+      // the explicit start → open the gate. NOT fired on restore (adopt happens
+      // in the constructor above), so a relaunch stays paused until resumed.
+      onRouteStarted: _gateCubit.start,
     );
     _mapCubit = MapCubit(geography: vietnamProvinceGeography);
     _statsCubit = StatsCubit(
@@ -502,7 +575,27 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
     _statsCubit.load(_engine.toProgress());
     _mapCubit.updateFromSnapshot(_engine.toProgress());
 
-    _ticker.start();
+    // route-real-road: the journey is DERIVED from route state. The runtime
+    // LISTENS to the gate and starts/stops the (current) ticker whenever the
+    // flag flips. It does NOT auto-start unconditionally — instead it OPENS the
+    // gate below when a committed active route was restored.
+    _gateSub = _gateCubit.stream.listen((running) {
+      if (running) {
+        _ticker.start();
+      } else {
+        _ticker.stop();
+      }
+    });
+    // Auto-run when a committed, NOT-yet-completed route was restored (no manual
+    // Start control exists anymore). No route (first run / not yet authored) or
+    // an already-COMPLETED route stays paused — nothing should accrue, and a
+    // finished journey must not keep growing lifetime distance after arrival
+    // (route-real-road review S2). Completion is also enforced live in
+    // `_onRouteChanged` for a route that arrives while running.
+    if (_routeCubit.state.selection != null &&
+        !(_routeCubit.state.position?.isCompleted ?? false)) {
+      _gateCubit.start();
+    }
     _wireMiniWindow();
   }
 
@@ -573,6 +666,13 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
 
   void _onRouteChanged(RouteViewState state) {
     _mapCubit.updateFromRoute(state);
+    // route-real-road review S2 — freeze the journey on arrival: a COMPLETED
+    // route must not keep accruing. Pausing the gate stops the ticker so the
+    // odometer freezes and the scene parks. Confirming/starting a NEW route
+    // re-opens it via onRouteStarted (a fresh route is never completed).
+    if (state.position?.isCompleted ?? false) {
+      _gateCubit.pause();
+    }
     final position = state.position;
     _statsCubit.updateRoute(
       position == null
@@ -588,13 +688,41 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
     );
   }
 
+  /// The DEFAULT route's real-road sub-path length (km): the bundled highway
+  /// between the two snapped province endpoints (Cà Mau → Cao Bằng, no stops) —
+  /// the same road geometry the map draws for the default route. `null` when the
+  /// road asset failed to load (degraded mode). Computed once from the two chain
+  /// tips so the pace matches the drawn default route exactly (route-real-road #4).
+  double? get _defaultRouteRoadLengthKm {
+    final road = widget.roadPath;
+    if (road == null) {
+      return null;
+    }
+    final chain = vietnamProvinceChain;
+    return RoadRoute.build(
+      road: road,
+      waypoints: <GeoCoordinate>[
+        vietnamProvinceGeography.coordinateOf(chain.nodes.first),
+        vietnamProvinceGeography.coordinateOf(chain.nodes.last),
+      ],
+    ).routeLengthKm;
+  }
+
   /// Builds (or rebuilds) the engine + ticker with [threshold], wiring the
   /// distance sink to route-progress and the snapshot sink to stats.
   void _buildEngineAndTicker(Duration threshold) {
     _engine = JourneyEngine(
       clock: _clock,
       activityPlugin: _activityPlugin,
-      kmPerActiveHour: vietnamProvinceChain.totalChainKm / 8,
+      // Pace off the DEFAULT ROUTE'S REAL-ROAD LENGTH (route-real-road / #4), so
+      // a full traversal of the drawn national road takes ≈ 8 active hours. The
+      // default route (Cà Mau → Cao Bằng, no stops) is drawn as the bundled
+      // highway sub-path between the two snapped province endpoints; its length is
+      // `_defaultRouteRoadLengthKm`. Falls back to the chain total ÷ 8 when the
+      // road asset failed to load (degraded mode). Only the injected RATE changes
+      // — the engine accrual mechanism is unchanged (ADR-0007 firewall).
+      kmPerActiveHour:
+          (_defaultRouteRoadLengthKm ?? vietnamProvinceChain.totalChainKm) / 8,
       threshold: threshold,
       grace: threshold < const Duration(minutes: 5)
           ? threshold
@@ -620,11 +748,12 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
       return;
     }
     final snapshot = _engine.toProgress();
-    final wasRunning = _ticker.isRunning;
     _ticker.dispose();
     _buildEngineAndTicker(threshold);
     _engine.restore(snapshot);
-    if (wasRunning) {
+    // route-real-road: respect the Start gate after a rebuild — only restart the
+    // ticker if the journey was running (never auto-resume a paused journey).
+    if (_gateCubit.state) {
       _ticker.start();
     }
   }
@@ -637,6 +766,8 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
     _hiddenToTraySub?.cancel();
     _shellCubit.close();
     _launchGateCubit.close();
+    _gateSub?.cancel();
+    _gateCubit.close();
     // NOTE: the native window/tray/visibility controllers are owned by
     // FocusJourneyApp and are NOT disposed here (a reset rebuild reuses them).
     _ticker.dispose();
@@ -659,6 +790,7 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
         BlocProvider<SettingsCubit>.value(value: _settingsCubit),
         BlocProvider<AppShellCubit>.value(value: _shellCubit),
         BlocProvider<LaunchGateCubit>.value(value: _launchGateCubit),
+        BlocProvider<JourneyGateCubit>.value(value: _gateCubit),
       ],
       // The single-window two-mode shell (ADR-0003): it owns the ONE shared
       // JourneyGame and switches between the full UI and the compact PiP.
@@ -676,6 +808,7 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
                 return LaunchPrompt(
                   chain: vietnamProvinceChain,
                   geography: vietnamProvinceGeography,
+                  road: widget.roadPath,
                 );
               }
               return BlocBuilder<SettingsCubit, AppSettings>(
@@ -694,6 +827,7 @@ class _JourneyRuntimeState extends State<_JourneyRuntime> {
                     chain: vietnamProvinceChain,
                     geography: vietnamProvinceGeography,
                     baseMap: widget.baseMap,
+                    road: widget.roadPath,
                     sharedGame: sharedGame,
                   );
                 },
@@ -718,6 +852,7 @@ class _HomeTabs extends StatefulWidget {
     required this.chain,
     required this.geography,
     required this.baseMap,
+    required this.road,
     required this.sharedGame,
   });
 
@@ -725,6 +860,7 @@ class _HomeTabs extends StatefulWidget {
   final ProvinceChain chain;
   final ProvinceGeography geography;
   final BaseMapGeometry baseMap;
+  final RoadPath? road;
   final JourneyGame sharedGame;
 
   @override
@@ -753,6 +889,7 @@ class _HomeTabsState extends State<_HomeTabs> {
                 chain: widget.chain,
                 geography: widget.geography,
                 baseMap: widget.baseMap,
+                road: widget.road,
               ),
               const _CompactPipButton(),
             ],

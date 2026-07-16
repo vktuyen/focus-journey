@@ -11,15 +11,17 @@ library;
 
 /// Copy for the destructive Factory-reset confirmation dialog (AC-1/AC-3/AC-12).
 abstract final class FactoryResetCopy {
-  /// The Settings action label that opens the confirmation.
-  static const String actionTitle = 'Factory reset';
+  /// The Settings action label that opens the confirmation. Friendlier full-wipe
+  /// wording (route-real-road / AC-6) — kept clearly distinct from the route-only
+  /// [LaunchPromptCopy.startOverLabel] ("Start over", which keeps lifetime stats).
+  static const String actionTitle = 'Reset everything';
 
   /// The Settings action subtitle (what it does, in one line).
   static const String actionSubtitle =
       'Erase all local data and return to a fresh first-run state.';
 
   /// Dialog title — states the irreversible outcome plainly.
-  static const String dialogTitle = 'Factory reset this app?';
+  static const String dialogTitle = 'Reset everything?';
 
   /// Dialog body — names the data loss (the BR-8 carve-out / AC-12 asymmetry):
   /// lifetime distance, streaks, and badges ARE cleared here, unlike Start over.
@@ -44,8 +46,7 @@ abstract final class FactoryResetCopy {
   /// clear). The app has already rebuilt to a fresh state, so this warns the
   /// user that some local data may remain rather than leaving it silent.
   static const String errorMessage =
-      'Some data could not be erased. The app has restarted; please try Factory '
-      'reset again.';
+      'Some data could not be erased. The app has restarted; please try again.';
 }
 
 /// Copy for the launch Resume vs Start over prompt (AC-6/AC-9/AC-12).

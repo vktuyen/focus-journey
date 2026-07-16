@@ -21,6 +21,7 @@ import 'package:equatable/equatable.dart';
 
 import 'province.dart';
 import 'province_chain.dart';
+import 'vietnam_units_2026.dart';
 
 /// A static geographic point (WGS-84 degrees). Pure value object — Equatable, no
 /// Flutter, no `latlong2`. Converted to a `latlong2.LatLng` only at the
@@ -129,32 +130,21 @@ class ProvinceGeography {
       ]);
 }
 
-/// The production geography for [vietnamProvinceChain] (map-experience Decision
-/// B). Real, approximately-correct city lat/long for all 13 checkpoints — enough
-/// to trace Vietnam's S-shape (south tip Mũi Cà Mau ~8.6 N → north tip Hà Giang
-/// ~22.8 N). These are public place coordinates (static reference data), NOT a
-/// device-location read (NFR-2). Validated against the chain at construction.
+/// The production geography for [vietnamProvinceChain] (province-chain-2026 /
+/// candidate ADR-0009). The administrative-centre lat/long for all **34 current
+/// units (2026)**, built from the single ordered source-of-record
+/// [kVietnamUnits2026] so the chain and the geography can never disagree about
+/// which units exist or where they sit (south tip Cà Mau ~9.18 N → north tip
+/// Cao Bằng ~22.67 N). These are public place coordinates (static reference
+/// data), NOT a device-location read (NFR-2). The old `mui_ca_mau` display-nudge
+/// is retired: Cà Mau's authoritative centre now lands on the drawn landmass
+/// directly. A handful of non-relocated coastal centres carry a small
+/// coast-alignment offset (documented in [kVietnamUnits2026]); relocated centres
+/// are exact. Validated against the chain at construction.
 final ProvinceGeography vietnamProvinceGeography = ProvinceGeography(
   chain: vietnamProvinceChain,
-  coordinates: const <String, GeoCoordinate>{
-    // Display alignment to the generalized bundled coastline: the true cape
-    // (~8.62, 104.72) sits ~800 m OFFSHORE of the simplified bundled outline, so
-    // the start pin / first segment / km=0 marker would render in the Gulf. This
-    // is a sub-1-km nudge (~0.95 km SSE) onto the drawn landmass so
-    // containsLandmass is true (AC-5/6/7); it is NOT a re-survey. The
-    // authoritative province-centre coordinate is re-derived in province-chain-2026.
-    'mui_ca_mau': GeoCoordinate(latitude: 8.613, longitude: 104.725),
-    'can_tho': GeoCoordinate(latitude: 10.04, longitude: 105.78),
-    'ho_chi_minh': GeoCoordinate(latitude: 10.82, longitude: 106.63),
-    'da_lat': GeoCoordinate(latitude: 11.94, longitude: 108.44),
-    'nha_trang': GeoCoordinate(latitude: 12.24, longitude: 109.19),
-    'quy_nhon': GeoCoordinate(latitude: 13.78, longitude: 109.22),
-    'da_nang': GeoCoordinate(latitude: 16.05, longitude: 108.20),
-    'hue': GeoCoordinate(latitude: 16.46, longitude: 107.59),
-    'vinh': GeoCoordinate(latitude: 18.68, longitude: 105.69),
-    'ninh_binh': GeoCoordinate(latitude: 20.25, longitude: 105.97),
-    'ha_noi': GeoCoordinate(latitude: 21.03, longitude: 105.85),
-    'sa_pa': GeoCoordinate(latitude: 22.34, longitude: 103.84),
-    'ha_giang': GeoCoordinate(latitude: 22.82, longitude: 104.98),
+  coordinates: <String, GeoCoordinate>{
+    for (final unit in kVietnamUnits2026)
+      unit.id: GeoCoordinate(latitude: unit.lat, longitude: unit.lon),
   },
 );

@@ -126,7 +126,13 @@ RoutePlan {
   `completed` flag (insufficient for the 3-state lifecycle). `RouteSelection` is retained internally as the
   per-sub-chain input the *unchanged* resolver/projector still take (they are constructed from the rebuilt
   sub-chain + its first node + derived direction), so AC-7's "unchanged" holds.
-- **Backward-compatibility / migration rule (DEFINED):** the existing corrupt-safe `load()` returns `null`
+- **Backward-compatibility / migration rule (DEFINED — the wholesale-topology case is AMENDED BY ADR-0009):**
+  The reconstruct-the-same-sub-path rule below still applies to an ordinary legacy blob on the *same*
+  geography. But when the underlying province topology + total km change **wholesale** (the 2026 34-unit
+  rebuild in `province-chain-2026`), ADR-0009 **overrides** this clause with **migrate-by-reset**: a legacy /
+  retired-id plan becomes a fresh full-spine active plan stamped at the current engine cumulative distance
+  (never an id-remap), because a remap onto a changed topology would misplace the traveller. Lifetime distance
+  (BR-8) is preserved either way. The original rule text: the existing corrupt-safe `load()` returns `null`
   on unreadable data. An **old `RouteSelection` blob** (start id + direction + offset + completed) written by
   the shipped build is **migrated forward**, not discarded: on load, if the blob has no `orderedNodeIds` but
   has a legacy `startId`+`direction`, reconstruct the route as the **full sub-path from that start to the

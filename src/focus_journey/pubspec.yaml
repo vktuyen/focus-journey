@@ -125,6 +125,14 @@ flutter:
     # to tool/svg_to_geojson.py) stay in the repo but are kept OUT of the app
     # bundle to avoid ~2.7 MB of dead weight (map-bundle-weight, 2026-07-15).
     - assets/map/vietnam_provinces_2025.geojson
+    # Vietnam's real national highway (route-real-road) — a static offline
+    # polyline of QL1 (Cà Mau→Lạng Sơn) + QL4A connector (Lạng Sơn→Cao Bằng), so
+    # the journey route follows the REAL curving road, not straight chords. Raw
+    # WGS84 [lon,lat] on the SAME unprojected bounds as the base map above.
+    # Dev-time sourced from OpenStreetMap (ODbL — © OpenStreetMap contributors);
+    # NO runtime network. Built by tool/build_national_route.py; attribution in
+    # assets/CREDITS.md.
+    - assets/map/vietnam_national_route.geojson
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

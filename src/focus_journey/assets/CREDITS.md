@@ -66,6 +66,41 @@ coincide, so this file inherits the pre-2025 base's already-verified frame.
 - Recommend a quick overlay re-check (drop 2–3 known city dots) during `/implement`
   before wiring precise per-province hit-testing.
 
+## Vietnam national highway route (route-real-road) — OpenStreetMap, ODbL
+
+Offline, static polyline of Vietnam's **real national highway**, so the journey
+route follows the actual curving road (not straight chords between cities). Sourced
+**at dev/build time from OpenStreetMap** via the Overpass API; the app ships only the
+static GeoJSON and makes **NO runtime network call** (preserves the zero-egress
+privacy promise — ADR-0008 posture). This is **ODbL** data, so **attribution IS
+required** (recorded per-row below); ODbL text: https://opendatacommons.org/licenses/odbl/1-0/
+
+| File (under assets/map/) | Source | Author | Licence | Attribution / notes |
+| --- | --- | --- | --- | --- |
+| vietnam_national_route.geojson | OpenStreetMap via Overpass API — route relations **15683339** (Quốc lộ 1 / QL1) and **18208508** (Quốc lộ 4A); exported **2026-07-16** from mirror `overpass.kumi.systems`. Query: `relation(<id>);out geom;` | © OpenStreetMap contributors | **ODbL 1.0** | **SHIPPED route layer.** Attribution string: *"Road data © OpenStreetMap contributors, ODbL"* (must appear in the in-app map credit alongside the base-map credit). FeatureCollection of two `LineString`s in raw WGS84 `[lon, lat]` (same unprojected frame + `bounds` N24/S8/W101.8/E110.3 as `vietnam_provinces_2025.geojson`; NOT pre-projected to pixels). **Feature 1 `QL1A`** = National Route 1, Đất Mũi (Cà Mau, ~8.76N) → Hữu Nghị (Lạng Sơn, ~21.97N), the coast-hugging S-curve. **Feature 2 `QL4A`** = Lạng Sơn → Cao Bằng connector, ends at its closest mapped approach to Cao Bằng city (~19 km NE at 106.32/22.83 — the OSM QL4A relation does not enter the city centre). |
+
+**Processing (offline, reproducible).** Built by `tool/build_national_route.py` from the
+raw Overpass `out geom;` exports. Member ways were stitched and ordered along a
+**piecewise-monotone parameter** — `lat+lon` (SW→NE diagonal) south of 12.3°N, latitude
+(S→N) north of it — taking the **median of each bin** to average the divided-carriageway
+dual ways and reject spur/outlier ways; the QL4A connector was ordered by greedy
+nearest-neighbour and trimmed at closest approach to Cao Bằng. Then **Douglas–Peucker**
+decimation (ε ≈ 0.006° ≈ 0.6 km).
+
+- **Vertex counts:** QL1: **74,632** raw OSM coords → 2,169 profile → **346** decimated.
+  QL4A: **13,614** raw → chained → **54** decimated. **Total shipped: 400 vertices**
+  (~9.5 KB), all inside the map bounds.
+- **Fidelity check:** the decimated QL1A passes within **≤7.6 km** of 15 known cities
+  spanning the whole route (Cà Mau, Cần Thơ, HCMC 2.9 km, Nha Trang, Đà Nẵng, Huế,
+  Vinh, Hà Nội, Lạng Sơn, …). Densely resampled, **99.5 %** of QL1A / **97.8 %** of QL4A
+  points fall on the bundled landmass; the ~0.5–2 % marginal misses are right at the
+  coastline where the *simplified base-map outline* sits slightly inland of the real
+  road (base-map simplification, not a sea excursion of the road).
+- **Coverage / gaps:** reaches Cà Mau (south terminus) and the Lạng Sơn/Hữu Nghị north
+  end; the connector gets the route into Cao Bằng province but stops **~19 km NE of Cao
+  Bằng city** (the mapped QL4A alignment does not enter the centre) — the route-integration
+  step handles the final north end.
+
 ## Vietnam base map — provinces (vietnam-map-fidelity) — SUPERSEDED / HISTORICAL (pre-2025 63 provinces)
 
 > **SUPERSEDED by the 34-unit 2025 map above.** These files show the **pre-2025

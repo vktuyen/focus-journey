@@ -195,10 +195,13 @@ void main() {
 
         // The optional OSM tile base was DROPPED (ADR-0008(c)); the base is a
         // bundled asset that never depends on a tile fetch. Regression guard for
-        // the drop: neither the layer type nor the URL string appears anywhere.
+        // the drop: no tile LAYER and no network tile URL appears. (The
+        // "© OpenStreetMap contributors, ODbL" ATTRIBUTION for the bundled road
+        // geometry is expected — route-real-road / NFR-4 — and is verified in the
+        // attribution tests; it is a static credit string, not a network fetch.)
         expect(find.byType(TileLayer), findsNothing);
-        expect(find.textContaining('OpenStreetMap'), findsNothing);
         expect(find.textContaining('tile.openstreetmap'), findsNothing);
+        expect(find.textContaining('http'), findsNothing);
         // The base still drew regardless (independent of any tile state).
         expect(baseMapLayer(tester), isNotNull);
         expect(tester.takeException(), isNull);
@@ -529,5 +532,122 @@ void main() {
         expect(find.text(state.orderedNodes.first.name), findsNothing);
       },
     );
+  });
+
+  group('route-real-road — curved road (AC-1)', () {
+    testWidgets('the drawn road has more vertices than the checkpoint count', (
+      tester,
+    ) async {
+      final state = resolveMapState(
+        chain: chain,
+        geography: geography,
+        selection: selectionFor(
+          chain,
+          'can_tho',
+          JourneyDirection.towardHaGiang,
+        ),
+        routeDistanceKm: 300,
+      );
+      await pumpMapView(tester, state, width: 800, height: 800);
+
+      final road = baseRoadPolylines(tester).single;
+      // A smooth curve is densified far beyond the raw checkpoint chords (AC-1).
+      expect(road.points.length, greaterThan(state.orderedNodes.length * 5));
+    });
+  });
+
+  group('route-real-road — marker hierarchy (AC-2/AC-3/AC-4/NFR-3)', () {
+    /// Counts the marker dots painted with [color] (emphasized teal vs pass-
+    /// through grey). Both are the only [DecoratedBox]es carrying these colours.
+    int dotsOfColour(WidgetTester tester, Color color) {
+      return tester
+          .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+          .where((d) {
+            final dec = d.decoration;
+            return dec is BoxDecoration && dec.color == color;
+          })
+          .length;
+    }
+
+    /// All marker Semantics labels (NFR-3 — the role is recoverable non-visually).
+    List<String> markerLabels(WidgetTester tester) {
+      return <String>[
+        for (final s in tester.widgetList<Semantics>(find.byType(Semantics)))
+          if (s.properties.label != null) s.properties.label!,
+      ];
+    }
+
+    int labelsMatching(WidgetTester tester, Pattern p) =>
+        markerLabels(tester).where((l) => l.startsWith(p as String)).length;
+
+    MapViewState fullSpineState({List<String> markedStopIds = const []}) {
+      return resolveMapState(
+        chain: chain,
+        geography: geography,
+        selection: selectionFor(
+          chain,
+          'can_tho',
+          JourneyDirection.towardHaGiang,
+        ),
+        routeDistanceKm: 300,
+        markedStopIds: markedStopIds,
+      );
+    }
+
+    testWidgets(
+      'only start + end are big; every pass-through is small grey (AC-2/AC-3)',
+      (tester) async {
+        final state = fullSpineState();
+        // can_tho → da_lat → da_nang → ha_noi → ha_giang (N = 5).
+        expect(state.orderedNodes, hasLength(5));
+        await pumpMapView(tester, state, width: 800, height: 800);
+
+        final labels = markerLabels(tester);
+        expect(labels, contains('Start: ${state.orderedNodes.first.name}'));
+        expect(
+          labels,
+          contains('Destination: ${state.orderedNodes.last.name}'),
+        );
+        // The three interior provinces are pass-through (never a Stop here).
+        expect(labelsMatching(tester, 'Passing through '), 3);
+        expect(labelsMatching(tester, 'Stop: '), 0);
+
+        // Exactly two big (teal) dots; three small grey dots.
+        expect(dotsOfColour(tester, kEmphasizedMarkerColor), 2);
+        expect(dotsOfColour(tester, kPassThroughGrey), 3);
+      },
+    );
+
+    testWidgets(
+      'a user-marked stop renders as a THIRD big marker (AC-4)',
+      (tester) async {
+        final state = fullSpineState(markedStopIds: <String>['da_lat']);
+        await pumpMapView(tester, state, width: 800, height: 800);
+
+        expect(markerLabels(tester), contains('Stop: Đà Lạt'));
+        // Start + end + the one stop = three big; the remaining two are grey.
+        expect(dotsOfColour(tester, kEmphasizedMarkerColor), 3);
+        expect(dotsOfColour(tester, kPassThroughGrey), 2);
+        // The pass-through provinces are still reachable/labelled (NFR-3).
+        expect(labelsMatching(tester, 'Passing through '), 2);
+      },
+    );
+
+    testWidgets('the compact minimap keeps the tier (small dots, no tooltips)', (
+      tester,
+    ) async {
+      final state = fullSpineState();
+      await pumpMapView(
+        tester,
+        state,
+        compact: true,
+        width: 150,
+        height: 190,
+      );
+      // Endpoints emphasized (teal), pass-through grey — but no tooltips/labels.
+      expect(dotsOfColour(tester, kEmphasizedMarkerColor), 2);
+      expect(dotsOfColour(tester, kPassThroughGrey), 3);
+      expect(find.byType(Tooltip), findsNothing);
+    });
   });
 }

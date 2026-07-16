@@ -15,6 +15,7 @@ import '../domain/geo_polyline.dart';
 import '../domain/idle_trace_mapper.dart';
 import '../domain/province.dart';
 import '../domain/province_geography.dart';
+import '../domain/road_route.dart';
 import '../domain/route_position.dart';
 import '../domain/route_selection.dart';
 
@@ -36,6 +37,10 @@ class MapViewState extends Equatable {
     required this.markerPosition,
     required this.idleStretches,
     this.countryPercent,
+    this.smoothedRoutePolyline = const GeoPolyline(<GeoCoordinate>[]),
+    this.emphasizedNodeIds = const <String>{},
+    this.roadRoute,
+    this.waypoints = const <Province>[],
   });
 
   /// The pre-selection default: no route chosen yet, nothing to draw.
@@ -43,7 +48,11 @@ class MapViewState extends Equatable {
     : selection = null,
       position = null,
       baseRoutePolyline = const GeoPolyline(<GeoCoordinate>[]),
+      smoothedRoutePolyline = const GeoPolyline(<GeoCoordinate>[]),
       orderedNodes = const <Province>[],
+      emphasizedNodeIds = const <String>{},
+      roadRoute = null,
+      waypoints = const <Province>[],
       markerPosition = null,
       idleStretches = const <IdleStretch>[],
       countryPercent = null;
@@ -59,11 +68,41 @@ class MapViewState extends Equatable {
   /// The resolved position along the chain, or `null` when no route is active.
   final RoutePosition? position;
 
-  /// The projected base road (origin → destination), real lat/long (AC-4).
+  /// The projected base road (origin → destination), real lat/long (AC-4). The
+  /// straight checkpoint chords — also the source of [checkpointCoordinates] so
+  /// the pins still sit on the real province centres.
   final GeoPolyline baseRoutePolyline;
+
+  /// The SMOOTHED curved road (route-real-road / AC-1): a denser Catmull-Rom
+  /// curve through the same checkpoint coordinates, precomputed once per route by
+  /// the [MapCubit] (NFR-1). The map surface strokes THIS as the road. Empty when
+  /// the state was built without a cubit (e.g. a direct-construction widget test);
+  /// the surface then smooths [baseRoutePolyline] inline as a fallback.
+  final GeoPolyline smoothedRoutePolyline;
 
   /// The route's checkpoints in travel order (origin → destination) — pins.
   final List<Province> orderedNodes;
+
+  /// The node ids that render as the LARGE/highlighted marker (route-real-road /
+  /// AC-2/AC-3): { start, end } ∪ user-marked stops. Every other on-route
+  /// checkpoint renders as a small grey pass-through dot. Empty before a route is
+  /// active.
+  final Set<String> emphasizedNodeIds;
+
+  /// The route drawn along the REAL BUNDLED ROAD (route-real-road / AC-2): the
+  /// bundled highway sub-path between the snapped waypoints. When present, THIS is
+  /// the geometry the map strokes (curves along the coast/road) — the chain
+  /// [smoothedRoutePolyline] is bypassed. `null` on the legacy/no-road path.
+  final RoadRoute? roadRoute;
+
+  /// The ordered waypoint provinces (start, user stops…, end) — aligned by index
+  /// with `roadRoute!.waypointCoordinates`. The ONLY markers drawn (big;
+  /// Google-style — AC-3). Empty on the legacy path.
+  final List<Province> waypoints;
+
+  /// The drawn road route's length in km — the route-length axis when
+  /// [roadRoute] is present (the km readout reflects THIS; route-real-road / #4).
+  double? get routeRoadLengthKm => roadRoute?.routeLengthKm;
 
   /// The current-position marker coordinate, projected from `routeDistanceKm`
   /// (AC-5). `null` when no route is active.
@@ -88,7 +127,11 @@ class MapViewState extends Equatable {
     selection,
     position,
     baseRoutePolyline,
+    smoothedRoutePolyline,
     orderedNodes,
+    emphasizedNodeIds,
+    roadRoute,
+    waypoints,
     markerPosition,
     idleStretches,
     countryPercent,

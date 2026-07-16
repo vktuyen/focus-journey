@@ -148,9 +148,10 @@ void main() {
 
       // AC-1/AC-2 / TC-803: the minimap renders the bundled OFFLINE base.
       expect(baseMapPresent(tester), isTrue);
-      // AC-10 / TC-816: no OSM tiles and no OSM URL anywhere (offline base).
+      // AC-10 / TC-816: no OSM tiles and no network tile URL anywhere (offline
+      // base). The compact minimap shows no attribution pill, so no credit text.
       expect(find.byType(TileLayer), findsNothing);
-      expect(find.textContaining('OpenStreetMap'), findsNothing);
+      expect(find.textContaining('tile.openstreetmap'), findsNothing);
 
       // A compact expand affordance marks it as tappable to open full-screen.
       expect(find.byIcon(Icons.open_in_full), findsOneWidget);
@@ -325,9 +326,14 @@ void main() {
         // The mandatory share-alike credit for the bundled Wikimedia base.
         expect(find.text(kBaseMapAttribution), findsOneWidget);
         expect(find.textContaining('CC BY-SA'), findsOneWidget);
-        // The dropped OSM tile base leaves no layer and no URL (offline base).
+        // route-real-road / NFR-4: the mandatory ODbL credit for the bundled road
+        // geometry sits alongside it.
+        expect(find.text(kRoadAttribution), findsOneWidget);
+        // The dropped OSM tile base leaves no tile layer and no network tile URL
+        // (offline base). The ODbL attribution above is a static credit, not a
+        // fetch — the offline guard is on the tile LAYER + tile URL only.
         expect(find.byType(TileLayer), findsNothing);
-        expect(find.textContaining('OpenStreetMap'), findsNothing);
+        expect(find.textContaining('tile.openstreetmap'), findsNothing);
       },
     );
 
@@ -441,7 +447,7 @@ class _InMemoryRouteRepo implements RouteRepository {
   Future<void> save(RouteSelection selection) async => _stored = selection;
 
   @override
-  Future<RoutePlan?> loadPlan() async => _storedPlan;
+  Future<RoutePlan?> loadPlan({double currentCumulativeKm = 0}) async => _storedPlan;
 
   @override
   Future<void> savePlan(RoutePlan plan) async => _storedPlan = plan;

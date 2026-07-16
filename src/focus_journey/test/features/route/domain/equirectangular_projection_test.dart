@@ -192,26 +192,51 @@ void main() {
     });
   });
 
-  group('route S->N projects monotone-northward in y (TC-807 — pure half)', () {
-    test('shippedChainCanonicalOrder_hasStrictlyDecreasingProjectedY', () {
+  group('route S->N reads broadly northward in y (TC-807 — pure half)', () {
+    test('shippedChainEndpointsAreTheProjectedYExtremes_broadlyNorthward', () {
       // canonicalCoordinates are ordered south tip -> north tip; northward is a
-      // SMALLER y in the frame, so projected-y must strictly decrease. Guards
-      // that the base projection preserves the shipped chain's S->N reading.
+      // SMALLER y in the frame. Under province-chain-2026 the spine is a
+      // hand-curated COAST-HUGGING order that threads inland units, so it is
+      // deliberately NOT a strict per-index latitude sort (PC-904) — a strict
+      // "y decreases at every step" assertion would contradict the resolved
+      // coast-hugging decision. Instead assert the OVERALL northward reading:
+      // the south tip projects to the largest y (bottom) and the north tip to
+      // the smallest y (top), and the net trend is northward.
       final coords = vietnamProvinceGeography.canonicalCoordinates;
-      double? previousY;
-      for (final coord in coords) {
-        final y = EquirectangularBounds.project(
-          coord.latitude,
-          coord.longitude,
-        ).y;
-        if (previousY != null) {
-          expect(
-            y,
-            lessThan(previousY),
-            reason: 'projected-y did not decrease northward at $coord',
-          );
-        }
-        previousY = y;
+      final ys = <double>[
+        for (final c in coords)
+          EquirectangularBounds.project(c.latitude, c.longitude).y,
+      ];
+      final maxY = ys.reduce((a, b) => a > b ? a : b);
+      final minY = ys.reduce((a, b) => a < b ? a : b);
+      expect(ys.first, closeTo(maxY, 1e-9), reason: 'south tip is bottommost');
+      expect(ys.last, closeTo(minY, 1e-9), reason: 'north tip is topmost');
+      expect(ys.last, lessThan(ys.first), reason: 'net reading is northward');
+    });
+  });
+
+  group('every 34-unit checkpoint projects on-canvas, no clamp fires '
+      '(AC-7 / PC-915)', () {
+    test('PC-915 all34CheckpointsStrictlyInsideZeroToOne_andUnclamped', () {
+      final coords = vietnamProvinceGeography.canonicalCoordinates;
+      expect(coords, hasLength(34));
+      for (final c in coords) {
+        final p = EquirectangularBounds.project(c.latitude, c.longitude);
+        // Strictly within (0, 1): the 34 units sit well inside the map frame,
+        // never on an edge.
+        expect(
+          p.x,
+          greaterThan(0.0),
+          reason: '$c x on/over the west edge (clamp risk)',
+        );
+        expect(p.x, lessThan(1.0), reason: '$c x on/over the east edge');
+        expect(p.y, greaterThan(0.0), reason: '$c y on/over the north edge');
+        expect(p.y, lessThan(1.0), reason: '$c y on/over the south edge');
+        // Equality with the RAW unclamped formula proves the out-of-bounds
+        // clamp never fired for any real checkpoint (a clamped point would
+        // differ from the raw value).
+        expect(p.x, closeTo(_expectX(c.longitude), kTightTol));
+        expect(p.y, closeTo(_expectY(c.latitude), kTightTol));
       }
     });
   });

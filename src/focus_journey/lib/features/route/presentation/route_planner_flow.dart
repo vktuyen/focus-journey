@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import '../domain/province.dart';
 import '../domain/province_chain.dart';
 import '../domain/province_geography.dart';
+import '../domain/road_path.dart';
 import '../domain/route_planner.dart';
 import 'route_picker.dart';
 import 'route_progress_cubit.dart';
@@ -34,6 +35,7 @@ class RoutePlannerFlow extends StatefulWidget {
     required this.geography,
     required this.onConfirmed,
     required this.onCancelled,
+    this.road,
     this.vehiclePicker,
     super.key,
   });
@@ -43,6 +45,11 @@ class RoutePlannerFlow extends StatefulWidget {
 
   /// The static geography (NFR-2).
   final ProvinceGeography geography;
+
+  /// The bundled national road (route-real-road), forwarded to
+  /// [RouteReviewScreen] so its distance readout reflects the REAL road length.
+  /// `null` (tests / degraded mode) falls back to the sub-chain km.
+  final RoadPath? road;
 
   /// Called with the confirmed candidate — the host commits it (the only
   /// mutation; AC-6/AC-7).
@@ -97,11 +104,10 @@ class _RoutePlannerFlowState extends State<RoutePlannerFlow> {
         onResolved: (resolved, markedStops) {
           // The candidate's travel-order endpoints ARE the picks (the planner is
           // pure; it already applied any AC-4 span extension from marked stops).
-          // The review screen re-resolves between those endpoints, treating both
-          // the endpoints AND the marked stops as protected (AC-2/AC-4); the
-          // auto-inserted intermediates are removable there (AC-5). The real
-          // marked-stop list is threaded through so an IN-span marked stop keeps
-          // its "not removable" protection (B1 fix).
+          // The review screen displays ONLY the anchors — the endpoints + the
+          // marked stops (route-real-road): the pass-through provinces are
+          // implicit road geometry, never listed. The real marked-stop list is
+          // threaded through so those stops appear as anchors in travel order.
           _onResolved(
             resolved,
             resolved.orderedNodes.first,
@@ -118,6 +124,7 @@ class _RoutePlannerFlowState extends State<RoutePlannerFlow> {
       end: _end!,
       markedStops: _markedStops,
       initial: candidate,
+      road: widget.road,
       onConfirm: widget.onConfirmed,
       // Cancelling the review returns to the picker (nothing recorded — AC-6).
       onCancel: _backToPicker,

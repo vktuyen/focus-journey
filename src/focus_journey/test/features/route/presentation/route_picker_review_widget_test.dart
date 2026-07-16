@@ -1,15 +1,24 @@
-// Widget tests for the route-planner-v2 picker + review-before-start screen
-// (ADR-0005). Drive the REAL RoutePicker / RouteReviewScreen / RoutePlannerFlow
-// over the fixture chain + geography. Pure: no engine, no timers, no network.
+// Widget tests for the route-planner-v2 picker + review-before-start screen,
+// updated for the real-road model (route-real-road). Drive the REAL RoutePicker
+// / RouteReviewScreen / RoutePlannerFlow over the fixture chain + geography.
+// Pure: no engine, no timers, no network.
+//
+// The review now lists ONLY the anchors — the start, any user-marked stops (in
+// travel order), and the end. Pass-through provinces are implicit road geometry
+// and are NOT listed; the old remove/skip-intermediate affordance is GONE.
 //
 // Traceability (one test ↔ one case; TC + AC ids in each description):
 //   TC-303 (AC-2)  start == end disabled in the picker; 2-checkpoint minimum
 //   TC-304 (AC-1)  picker offers free start+end choices; no N/S direction toggle
-//   TC-309 (AC-4)  review reflects the AC-4-extended endpoints (widget half)
-//   TC-310 (AC-5)  review shows the ordered route + total distance
-//   TC-311 (AC-5)  removing an intermediate re-resolves the list + total distance
-//   TC-312 (AC-2/AC-5) endpoints are not removable below the 2-checkpoint minimum
+//   TC-309 (AC-4)  review reflects the AC-4-extended endpoints; marked stops are
+//                  anchors, pass-through provinces are NOT listed
+//   TC-310 (AC-5)  review shows ONLY the anchors + the route distance
+//   TC-311 (route-real-road) pass-through provinces are implicit — not listed,
+//                  no remove/skip controls exist
+//   TC-312 (AC-2)  endpoints are shown locked; no remove controls anywhere
 //   TC-313 (AC-5)  cancelling the review returns to the picker (navigation only)
+//   TC-340 (route-real-road) the distance readout uses the REAL road length when
+//                  a RoadPath is provided; falls back to subPathKm when it isn't
 //   TC-339 (NFR-3) picker + review controls are semantically labelled + keyboard
 //                  reachable (deterministic half)
 
@@ -18,6 +27,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:focus_journey/features/route/domain/province.dart';
 import 'package:focus_journey/features/route/domain/province_chain.dart';
 import 'package:focus_journey/features/route/domain/province_geography.dart';
+import 'package:focus_journey/features/route/domain/road_path.dart';
+import 'package:focus_journey/features/route/domain/road_route.dart';
 import 'package:focus_journey/features/route/domain/route_planner.dart';
 import 'package:focus_journey/features/route/presentation/route_picker.dart';
 import 'package:focus_journey/features/route/presentation/route_planner_flow.dart';
@@ -36,6 +47,10 @@ void main() {
     chain = buildFixtureChain();
     geography = buildFixtureGeography(chain);
   });
+
+  /// A fixture "national road" built from the ordered canonical coordinates so
+  /// [RoadRoute] can snap the anchors + measure a real great-circle length.
+  RoadPath fixtureRoad() => RoadPath(geography.canonicalCoordinates);
 
   /// Whether any explicit [Semantics] widget in the tree carries [label] — a
   /// robust check for screen-reader labels on `Semantics(label: ...)` widgets
@@ -84,6 +99,7 @@ void main() {
     required void Function(ResolvedRoute) onConfirm,
     required VoidCallback onCancel,
     List<Province> markedStops = const <Province>[],
+    RoadPath? road,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -96,6 +112,7 @@ void main() {
               end: initial.orderedNodes.last,
               markedStops: markedStops,
               initial: initial,
+              road: road,
               onConfirm: onConfirm,
               onCancel: onCancel,
             ),
@@ -203,6 +220,8 @@ void main() {
 
         await tester.tap(find.byKey(const Key('route_picker_continue')));
         await tester.pump();
+        // The internal sub-chain still carries every province (the geometry
+        // needs it); only the DISPLAYED review list is trimmed to anchors.
         expect(resolved!.orderedNodeIds, <String>[
           'can_tho',
           'da_lat',
@@ -214,10 +233,12 @@ void main() {
 
   group('TC-309 (AC-4) review reflects the AC-4-extended endpoints', () {
     testWidgets(
-      'a stop outside [start,end] extends the span; review shows the new end',
+      'a stop outside [start,end] extends the span; review shows the new end and '
+      'omits the pass-through provinces',
       (tester) async {
         // start=Cần Thơ, end=Đà Lạt, stop=Hà Nội (beyond Đà Lạt) → extends to
-        // Hà Nội: can_tho → da_lat → da_nang → ha_noi.
+        // Hà Nội: can_tho → da_lat → da_nang → ha_noi. Anchors = {can_tho,
+        // ha_noi} (da_lat/da_nang are pass-through, not marked).
         final extended = resolve(
           'can_tho',
           'da_lat',
@@ -244,6 +265,13 @@ void main() {
           findsOneWidget,
         );
         expect(
+          find.byKey(const Key('route_review_stop_can_tho')),
+          findsOneWidget,
+        );
+        // Pass-through provinces are implicit road geometry — NOT listed.
+        expect(find.byKey(const Key('route_review_stop_da_lat')), findsNothing);
+        expect(find.byKey(const Key('route_review_stop_da_nang')), findsNothing);
+        expect(
           find.byKey(const Key('route_review_total_distance')),
           findsOneWidget,
         );
@@ -253,14 +281,12 @@ void main() {
     );
 
     testWidgets(
-      'B1: an IN-span marked stop is NOT removable on review (AC-4 — a marked '
-      'stop must stay in the route); endpoints + the in-span marked stop are '
-      'both protected, while a non-marked auto-inserted intermediate stays '
-      'removable',
+      'a marked in-span stop is shown as an anchor in travel order; a non-marked '
+      'pass-through province is NOT listed',
       (tester) async {
         // start=Cần Thơ, end=Hà Nội, mark Đà Nẵng (an IN-span stop). Resolved:
-        // can_tho → da_lat → da_nang → ha_noi. da_nang is a MARKED in-span stop;
-        // da_lat is a plain auto-inserted intermediate.
+        // can_tho → da_lat → da_nang → ha_noi. Anchors = {can_tho, da_nang,
+        // ha_noi}; da_lat is a plain pass-through and is omitted.
         final route = resolve('can_tho', 'ha_noi', stops: <String>['da_nang']);
         expect(route.orderedNodeIds, <String>[
           'can_tho',
@@ -272,42 +298,35 @@ void main() {
         await pumpReview(
           tester,
           initial: route,
-          // The real marked-stop list is threaded through (B1 fix) — without it
-          // da_nang would wrongly expose a remove control.
           markedStops: <Province>[nodeById(chain, 'da_nang')],
           onConfirm: (_) {},
           onCancel: () {},
         );
 
-        // Endpoints are protected (no remove control).
+        // The marked in-span stop appears as an anchor.
         expect(
-          find.byKey(const Key('route_review_remove_can_tho')),
-          findsNothing,
+          find.byKey(const Key('route_review_stop_da_nang')),
+          findsOneWidget,
         );
-        expect(
-          find.byKey(const Key('route_review_remove_ha_noi')),
-          findsNothing,
-        );
-        // The IN-span MARKED stop (da_nang) is ALSO protected — it must stay in
-        // the route (AC-4). This is the B1 regression assertion.
+        // The non-marked pass-through province is NOT listed.
+        expect(find.byKey(const Key('route_review_stop_da_lat')), findsNothing);
+        // No remove/skip controls exist for anything (the feature is gone).
+        expect(find.byKey(const Key('route_review_remove_da_lat')), findsNothing);
         expect(
           find.byKey(const Key('route_review_remove_da_nang')),
           findsNothing,
         );
-        // A plain (non-marked) auto-inserted intermediate stays removable (AC-5).
-        expect(
-          find.byKey(const Key('route_review_remove_da_lat')),
-          findsOneWidget,
-        );
+        expect(find.text('Skipped (tap to add back)'), findsNothing);
       },
     );
   });
 
-  group('TC-310 (AC-5) review shows the ordered route + total distance', () {
-    testWidgets('full ordered list and total subPathKm are rendered', (
+  group('TC-310 (AC-5) review shows ONLY the anchors + the route distance', () {
+    testWidgets('only start + end are listed; pass-through provinces are omitted', (
       tester,
     ) async {
-      // Cần Thơ → Đà Lạt → Đà Nẵng → Hà Nội (170+300+310 = 780 km).
+      // Cần Thơ → (Đà Lạt) → (Đà Nẵng) → Hà Nội. No marked stops → anchors are
+      // just the endpoints. subPathKm = 170+300+310 = 780 (road == null fallback).
       final route = resolve('can_tho', 'ha_noi');
       await pumpReview(
         tester,
@@ -316,21 +335,23 @@ void main() {
         onCancel: () {},
       );
 
-      // Every checkpoint in the ordered list is rendered, in order.
-      for (final id in route.orderedNodeIds) {
-        expect(find.byKey(Key('route_review_stop_$id')), findsOneWidget);
-      }
-      // Total route distance == subPathKm (780), within display rounding.
+      // Only the two endpoints are listed.
+      expect(find.byKey(const Key('route_review_stop_can_tho')), findsOneWidget);
+      expect(find.byKey(const Key('route_review_stop_ha_noi')), findsOneWidget);
+      // The pass-through provinces are implicit and NOT listed.
+      expect(find.byKey(const Key('route_review_stop_da_lat')), findsNothing);
+      expect(find.byKey(const Key('route_review_stop_da_nang')), findsNothing);
+      // With no RoadPath supplied, the readout falls back to subPathKm (780).
       expect(route.subPathKm, closeTo(780, kTol));
       expect(find.textContaining('780 km'), findsOneWidget);
     });
   });
 
-  group('TC-311 (AC-5) removing an intermediate re-resolves the route', () {
+  group('TC-311 (route-real-road) pass-through provinces are implicit', () {
     testWidgets(
-      'removing Đà Nẵng drops it from the list and updates the total distance',
+      'no remove/skip controls exist and no "Skipped" section is rendered',
       (tester) async {
-        // Cần Thơ → Đà Lạt → Đà Nẵng → Hà Nội (780 km).
+        // Cần Thơ → Hà Nội (two pass-through provinces internally).
         final route = resolve('can_tho', 'ha_noi');
         await pumpReview(
           tester,
@@ -338,125 +359,53 @@ void main() {
           onConfirm: (_) {},
           onCancel: () {},
         );
-        expect(find.textContaining('780 km'), findsOneWidget);
 
-        // Remove the auto-inserted intermediate Đà Nẵng.
-        await tester.tap(find.byKey(const Key('route_review_remove_da_nang')));
-        await tester.pumpAndSettle();
-
-        // It disappears from the ordered list (moves to "skipped").
-        expect(
-          find.byKey(const Key('route_review_stop_da_nang')),
-          findsNothing,
-        );
-        // The remaining list is can_tho → da_lat → ha_noi; the merged total is
-        // still 780 km (segments merge — the canonical axis is preserved).
-        expect(
-          find.byKey(const Key('route_review_stop_can_tho')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const Key('route_review_stop_da_lat')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const Key('route_review_stop_ha_noi')),
-          findsOneWidget,
-        );
-        expect(find.textContaining('780 km'), findsOneWidget);
-        // The removal is reversible (offered back under "Skipped").
+        // No remove control for ANY province (endpoints or pass-through).
+        expect(find.byKey(const Key('route_review_remove_can_tho')), findsNothing);
+        expect(find.byKey(const Key('route_review_remove_da_lat')), findsNothing);
+        expect(find.byKey(const Key('route_review_remove_da_nang')), findsNothing);
+        expect(find.byKey(const Key('route_review_remove_ha_noi')), findsNothing);
+        expect(find.byType(IconButton), findsNothing);
+        // No removed/"Skipped" section survives.
+        expect(find.text('Skipped (tap to add back)'), findsNothing);
         expect(
           find.byKey(const Key('route_review_removed_da_nang')),
-          findsOneWidget,
+          findsNothing,
         );
       },
     );
+  });
 
+  group('TC-312 (AC-2) endpoints are shown locked; no remove controls', () {
     testWidgets(
-      'removing a Đà Lạt intermediate from a 3-node route changes the readout '
-      'list while preserving subPathKm',
+      'an adjacent 2-checkpoint route lists both endpoints, neither removable',
       (tester) async {
-        // can_tho → da_lat → da_nang (470 km).
-        final route = resolve('can_tho', 'da_nang');
+        // Adjacent endpoints — a 2-checkpoint route with no intermediates.
+        final route = resolve('mui', 'can_tho');
+        expect(route.orderedNodeIds, <String>['mui', 'can_tho']);
         await pumpReview(
           tester,
           initial: route,
           onConfirm: (_) {},
           onCancel: () {},
         );
-        await tester.tap(find.byKey(const Key('route_review_remove_da_lat')));
-        await tester.pumpAndSettle();
-        expect(find.byKey(const Key('route_review_stop_da_lat')), findsNothing);
-        // Merged: 170 + 300 = 470; still shown.
-        expect(find.textContaining('470 km'), findsOneWidget);
+
+        // Both endpoints are rendered as locked anchors — no remove controls.
+        expect(find.byKey(const Key('route_review_stop_mui')), findsOneWidget);
+        expect(
+          find.byKey(const Key('route_review_stop_can_tho')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('route_review_remove_mui')), findsNothing);
+        expect(
+          find.byKey(const Key('route_review_remove_can_tho')),
+          findsNothing,
+        );
+        // The locked cue is present on the anchor rows.
+        expect(find.byIcon(Icons.lock_outline), findsNWidgets(2));
       },
     );
   });
-
-  group(
-    'TC-312 (AC-2/AC-5) endpoints not removable below the 2-checkpoint min',
-    () {
-      testWidgets(
-        'with two checkpoints remaining the endpoints have no remove control',
-        (tester) async {
-          // Adjacent endpoints — a 2-checkpoint route with no intermediates.
-          final route = resolve('mui', 'can_tho');
-          expect(route.orderedNodeIds, <String>['mui', 'can_tho']);
-          await pumpReview(
-            tester,
-            initial: route,
-            onConfirm: (_) {},
-            onCancel: () {},
-          );
-
-          // Both endpoints are rendered, but neither exposes a remove button —
-          // they are protected (the 2-checkpoint minimum holds; AC-2).
-          expect(
-            find.byKey(const Key('route_review_stop_mui')),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(const Key('route_review_stop_can_tho')),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(const Key('route_review_remove_mui')),
-            findsNothing,
-          );
-          expect(
-            find.byKey(const Key('route_review_remove_can_tho')),
-            findsNothing,
-          );
-        },
-      );
-
-      testWidgets(
-        'after removing the only intermediate, the two endpoints stay non-removable',
-        (tester) async {
-          // can_tho → da_lat → da_nang; remove da_lat → endpoints only remain.
-          final route = resolve('can_tho', 'da_nang');
-          await pumpReview(
-            tester,
-            initial: route,
-            onConfirm: (_) {},
-            onCancel: () {},
-          );
-          await tester.tap(find.byKey(const Key('route_review_remove_da_lat')));
-          await tester.pumpAndSettle();
-
-          // Only the two endpoints remain, neither removable (cannot collapse).
-          expect(
-            find.byKey(const Key('route_review_remove_can_tho')),
-            findsNothing,
-          );
-          expect(
-            find.byKey(const Key('route_review_remove_da_nang')),
-            findsNothing,
-          );
-        },
-      );
-    },
-  );
 
   group('TC-313 (AC-5) cancelling the review returns to the picker', () {
     testWidgets(
@@ -494,6 +443,52 @@ void main() {
     );
   });
 
+  group('TC-340 (route-real-road) distance readout uses the real road length', () {
+    testWidgets(
+      'with a RoadPath, the readout shows the road length (not subPathKm)',
+      (tester) async {
+        final route = resolve('can_tho', 'ha_noi'); // subPathKm 780
+        final road = fixtureRoad();
+        // The real road length between the anchors — the same axis the map draws.
+        final roadKm = RoadRoute.build(
+          road: road,
+          waypoints: <GeoCoordinate>[
+            geography.coordinateOf(nodeById(chain, 'can_tho')),
+            geography.coordinateOf(nodeById(chain, 'ha_noi')),
+          ],
+        ).routeLengthKm;
+        // The road length differs from the chain-km fallback (proves the axis).
+        expect(roadKm.round(), isNot(route.subPathKm.round()));
+
+        await pumpReview(
+          tester,
+          initial: route,
+          road: road,
+          onConfirm: (_) {},
+          onCancel: () {},
+        );
+
+        expect(find.textContaining('${roadKm.round()} km'), findsOneWidget);
+        // The old chain-km value is NOT shown when a road is provided.
+        expect(find.textContaining('780 km'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'without a RoadPath, the readout falls back to subPathKm',
+      (tester) async {
+        final route = resolve('can_tho', 'ha_noi'); // subPathKm 780
+        await pumpReview(
+          tester,
+          initial: route,
+          onConfirm: (_) {},
+          onCancel: () {},
+        );
+        expect(find.textContaining('780 km'), findsOneWidget);
+      },
+    );
+  });
+
   group('TC-339 (NFR-3) picker + review are labelled + keyboard-reachable', () {
     testWidgets('picker exposes accessible names for both endpoint choosers', (
       tester,
@@ -512,7 +507,7 @@ void main() {
     testWidgets(
       'review exposes a labelled distance readout + activatable confirm/cancel',
       (tester) async {
-        final route = resolve('can_tho', 'ha_noi'); // 780 km
+        final route = resolve('can_tho', 'ha_noi'); // 780 km fallback
         await pumpReview(
           tester,
           initial: route,
@@ -541,11 +536,8 @@ void main() {
               .onPressed,
           isNotNull,
         );
-        // Each removable intermediate's remove control has a tooltip label.
-        final removeBtn = tester.widget<IconButton>(
-          find.byKey(const Key('route_review_remove_da_lat')),
-        );
-        expect(removeBtn.tooltip, isNotNull);
+        // The anchor rows carry a screen-reader "kept" cue (no remove controls).
+        expect(semanticsLabelled(tester, 'Stop — kept'), isTrue);
       },
     );
   });

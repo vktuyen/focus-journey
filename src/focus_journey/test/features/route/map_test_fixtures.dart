@@ -31,6 +31,7 @@ import 'package:focus_journey/features/route/domain/journey_direction.dart';
 import 'package:focus_journey/features/route/domain/province.dart';
 import 'package:focus_journey/features/route/domain/province_chain.dart';
 import 'package:focus_journey/features/route/domain/province_geography.dart';
+import 'package:focus_journey/features/route/domain/route_curve.dart';
 import 'package:focus_journey/features/route/domain/route_polyline_projector.dart';
 import 'package:focus_journey/features/route/domain/route_progress_resolver.dart';
 import 'package:focus_journey/features/route/domain/route_selection.dart';
@@ -130,12 +131,15 @@ JourneyProgress progressWith({
 /// mapper — so a widget test exercises the production projection path without a
 /// cubit or any engine. [routeDistanceKm] is the per-route distance (= cumulative
 /// − offset). [segments] are absolute-cumulative-km idle/active spans.
+/// [markedStopIds] seeds the user-marked-stop emphasis (route-real-road / AC-4);
+/// the emphasized set is always { start, end } ∪ these ids (AC-2/AC-3).
 MapViewState resolveMapState({
   required ProvinceChain chain,
   required ProvinceGeography geography,
   required RouteSelection selection,
   required double routeDistanceKm,
   List<ActivitySegment> segments = const <ActivitySegment>[],
+  List<String> markedStopIds = const <String>[],
 }) {
   final position = RouteProgressResolver.resolve(
     routeDistanceKm: routeDistanceKm,
@@ -152,11 +156,18 @@ MapViewState resolveMapState({
     selection: selection,
     projector: projector,
   );
+  final ordered = projector.orderedNodes;
   return MapViewState(
     selection: selection,
     position: position,
     baseRoutePolyline: GeoPolyline(projector.baseRoutePolyline),
-    orderedNodes: projector.orderedNodes,
+    smoothedRoutePolyline: GeoPolyline(smoothCurve(projector.baseRoutePolyline)),
+    orderedNodes: ordered,
+    emphasizedNodeIds: <String>{
+      if (ordered.isNotEmpty) ordered.first.id,
+      if (ordered.isNotEmpty) ordered.last.id,
+      ...markedStopIds,
+    },
     markerPosition: marker,
     idleStretches: stretches,
   );

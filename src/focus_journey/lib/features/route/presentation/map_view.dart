@@ -25,6 +25,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../../journey/domain/activity_segment.dart';
 import '../domain/base_map_geometry.dart';
+import '../domain/province_geography.dart';
+import '../domain/route_curve.dart';
 import 'base_map_layer.dart';
 import 'lat_lng_mapper.dart';
 import 'map_view_state.dart';
@@ -40,6 +42,12 @@ const String kBaseMapAttribution =
     'Base map: Vietnam administrative divisions 2025 by TUBS / PIkne — '
     'modified (reprojected & simplified), CC BY-SA 3.0, via Wikimedia Commons';
 
+/// The required in-app attribution for the bundled national-road geometry
+/// (route-real-road / NFR-4). The road is OpenStreetMap data under ODbL
+/// (share-alike) → the credit is MANDATORY. Surfaced alongside the base-map
+/// CC BY-SA line on the map attribution pill.
+const String kRoadAttribution = 'Road data © OpenStreetMap contributors, ODbL';
+
 /// The single "drifted off" red the idle trace uses (AC-8: one colour; the cause
 /// is conveyed by the stroke PATTERN, not a second hue).
 const Color kIdleRed = Color(0xFFD32F2F);
@@ -47,6 +55,14 @@ const Color kIdleRed = Color(0xFFD32F2F);
 /// The base-road colour (a calm slate so the red trace reads clearly on top of
 /// the land fill).
 const Color kBaseRoadColor = Color(0xFF37474F);
+
+/// The muted grey of a pass-through checkpoint marker (route-real-road / AC-2) —
+/// de-emphasized so the big start/end/stop markers read as the route's anchors.
+const Color kPassThroughGrey = Color(0xFF9E9E9E);
+
+/// The prominent marker colour for the emphasized start / end / stop checkpoints
+/// (route-real-road / AC-2) — the shipped teal pin, kept as the "big" look.
+const Color kEmphasizedMarkerColor = Color(0xFF26A69A);
 
 /// The compact minimap background — the themed sea tone behind the bundled land
 /// polygons (the sea is the app's own background — ADR-0008(b)). Shared with the
@@ -56,7 +72,7 @@ const Color kCompactMapBackground = kSeaBackground;
 /// The shared map surface. Renders the bundled offline Vietnam base (34-province
 /// [PolygonLayer]) UNDER the projected base road, the red idle trace, the
 /// checkpoint pins, and the current-position marker. No tiles, no network.
-class MapView extends StatelessWidget {
+class MapView extends StatefulWidget {
   /// Creates the map surface from a resolved [state] over the bundled
   /// [baseMap] geometry.
   ///
@@ -89,8 +105,68 @@ class MapView extends StatelessWidget {
   final bool compact;
 
   @override
+  State<MapView> createState() => _MapViewState();
+}
+
+class _MapViewState extends State<MapView> {
+  // Convenience getters so the render helpers read the widget config unchanged
+  // after the StatelessWidget → StatefulWidget conversion.
+  MapViewState get state => widget.state;
+  BaseMapGeometry? get baseMap => widget.baseMap;
+  bool get compact => widget.compact;
+
+  // Memoized LatLng conversions (route-real-road review S4). The base + road
+  // polylines are ~2,500 vertices; their source GeoCoordinate lists are
+  // identity-stable across ticks (the RoadRoute / projector geometry is
+  // memoized once per route in the cubit). Since the current-position marker
+  // lives in MapViewState, every tick rebuilds this widget — but re-projecting
+  // the whole road per tick is wasted work. We reconvert ONLY when the source
+  // list reference changes; the marker + idle layers still rebuild every tick.
+  List<GeoCoordinate>? _baseSource;
+  List<LatLng> _basePoints = const <LatLng>[];
+  List<GeoCoordinate>? _roadSource;
+  List<LatLng> _roadPoints = const <LatLng>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuildLatLngCaches();
+  }
+
+  @override
+  void didUpdateWidget(covariant MapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _rebuildLatLngCaches();
+  }
+
+  /// Reconverts the base + stroked-road polylines to LatLng only when their
+  /// underlying GeoCoordinate list identity changes (a route change), never on
+  /// a bare distance tick. Keying the road on its SOURCE list (the cubit's
+  /// smoothed curve when present, else the base chords) — rather than on
+  /// `_roadCoordinates()`, which may build a fresh smoothed list in the
+  /// direct-construction fallback — keeps the (possibly expensive) smoothing to
+  /// once per route.
+  void _rebuildLatLngCaches() {
+    final basePts = state.baseRoutePolyline.points;
+    if (!identical(basePts, _baseSource)) {
+      _baseSource = basePts;
+      _basePoints = toLatLngs(basePts);
+    }
+    final smoothed = state.smoothedRoutePolyline.points;
+    final roadSource = smoothed.isNotEmpty ? smoothed : basePts;
+    if (!identical(roadSource, _roadSource)) {
+      _roadSource = roadSource;
+      _roadPoints = toLatLngs(_roadCoordinates());
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final basePoints = toLatLngs(state.baseRoutePolyline.points);
+    // Cached LatLng lists (S4) — the checkpoint chords used to fit the camera +
+    // place the pins, and the SMOOTHED curved road the surface strokes
+    // (route-real-road / AC-1). Reconverted only on a route change, above.
+    final basePoints = _basePoints;
+    final roadPoints = _roadPoints;
     final base = baseMap;
     final map = FlutterMap(
       options: MapOptions(
@@ -115,7 +191,7 @@ class MapView extends StatelessWidget {
         // The bundled Vietnam base FIRST so every overlay draws on top of it
         // (z-order: base beneath, overlays above — AC-11).
         if (base != null) ...buildBaseMapLayers(base, compact: compact),
-        _baseRoadLayer(basePoints),
+        _baseRoadLayer(roadPoints),
         ..._idleTraceLayers(),
         _markerLayer(),
         // In-app CC BY-SA credit for the bundled base (AC-9) — full-screen only
@@ -129,7 +205,23 @@ class MapView extends StatelessWidget {
     return ColoredBox(color: kSeaBackground, child: map);
   }
 
-  /// The base road: the projected province polyline (real lat/long, AC-4).
+  /// The road coordinates to stroke: the cubit's precomputed smoothed curve
+  /// (route-real-road / AC-1) when present, else an inline smoothing of the
+  /// checkpoint chords (direct-construction fallback), else the chords as-is for
+  /// a sub-3-point route (nothing to smooth).
+  List<GeoCoordinate> _roadCoordinates() {
+    final smoothed = state.smoothedRoutePolyline.points;
+    if (smoothed.isNotEmpty) {
+      return smoothed;
+    }
+    final chords = state.baseRoutePolyline.points;
+    if (chords.length >= 3) {
+      return smoothCurve(chords);
+    }
+    return chords;
+  }
+
+  /// The base road: the smoothed curved route polyline (real lat/long, AC-1/AC-4).
   PolylineLayer<Object> _baseRoadLayer(List<LatLng> points) {
     return PolylineLayer<Object>(
       polylines: <Polyline<Object>>[
@@ -178,49 +270,130 @@ class MapView extends StatelessWidget {
   /// The checkpoint pins + the current-position marker. The marker is projected
   /// from `routeDistanceKm` (AC-5); at km=0 it sits on the start pin (AC-10).
   ///
-  /// On the FULL-SCREEN surface ([compact] == false) each checkpoint also gets
-  /// a legible province-name label under its pin and a desktop hover [Tooltip]
-  /// naming the stop — so the route's stops are identifiable on the base map.
-  /// The compact minimap ([compact] == true) keeps bare dots (no labels /
-  /// tooltips) so it stays uncluttered at ~150px (minimap unchanged).
+  /// MARKER HIERARCHY (route-real-road / AC-2/AC-3): a checkpoint whose node id is
+  /// in `state.emphasizedNodeIds` — the **start**, the **end**, and any
+  /// **user-marked stop** — renders as the LARGE prominent marker; every other
+  /// on-route province renders as a SMALL GREY pass-through dot. Each keeps a
+  /// meaningful semantic label + hover tooltip so it stays reachable (NFR-3).
+  ///
+  /// On the FULL-SCREEN surface ([compact] == false) the big markers also carry a
+  /// legible province-name label under the pin. The compact minimap ([compact] ==
+  /// true) keeps bare dots (endpoints/stops slightly larger) so it stays
+  /// uncluttered at ~150px.
   MarkerLayer _markerLayer() {
-    final checkpoints = state.checkpointCoordinates;
-    final labelled = !compact;
-    final markers = <Marker>[
-      for (var i = 0; i < checkpoints.length; i++)
-        Marker(
-          point: toLatLng(checkpoints[i]),
-          // A labelled checkpoint needs extra room beneath the dot for the
-          // province name; a bare minimap dot stays compact.
-          width: labelled ? 120 : 16,
-          height: labelled ? 44 : 16,
-          // Anchor at the top so the dot stays on the road vertex and the label
-          // hangs below it (labelled mode only).
-          alignment: labelled ? Alignment.topCenter : Alignment.center,
-          // Full-screen: a labelled + hover-tooltipped checkpoint. Minimap:
-          // a bare dot with only its Semantics label (unchanged — no tooltip,
-          // no name label, stays uncluttered at ~150px).
-          child: i < state.orderedNodes.length
-              ? (labelled
-                    ? _CheckpointMarker(name: state.orderedNodes[i].name)
-                    : Semantics(
-                        label: 'Checkpoint ${state.orderedNodes[i].name}',
-                        child: const _CheckpointPin(),
-                      ))
-              : Semantics(label: 'Checkpoint', child: const _CheckpointPin()),
-        ),
-      if (state.markerPosition != null)
-        Marker(
-          point: toLatLng(state.markerPosition!),
-          width: 22,
-          height: 22,
-          child: Semantics(
-            label: 'Your current position on the route',
-            child: const _CurrentPositionMarker(),
+    // route-real-road (AC-3): when the route follows the real road, the ONLY
+    // markers are the waypoints — big on the start, the end, and any user-added
+    // stops. There are NO per-province dots. The markers sit at the REAL province
+    // locations; the drawn line detours off the highway (a spur) to reach each of
+    // them, so every marker still lies on the drawn line.
+    final road = state.roadRoute;
+    final List<Marker> markers;
+    if (road != null && state.waypoints.isNotEmpty) {
+      final coords = road.waypointCoordinates;
+      final lastIndex = state.waypoints.length - 1;
+      markers = <Marker>[
+        for (var i = 0; i < state.waypoints.length && i < coords.length; i++)
+          _checkpointMarker(
+            point: toLatLng(coords[i]),
+            name: state.waypoints[i].name,
+            emphasized: true,
+            isStart: i == 0,
+            isEnd: i == lastIndex,
           ),
-        ),
-    ];
+        if (state.markerPosition != null) _currentPositionMarker(),
+      ];
+    } else {
+      // Legacy/no-road fallback (kept for hosts/tests that inject no road asset):
+      // the chain-projected checkpoint pins, emphasized start/end/stops big.
+      final checkpoints = state.checkpointCoordinates;
+      final lastIndex = checkpoints.length - 1;
+      markers = <Marker>[
+        for (var i = 0; i < checkpoints.length; i++)
+          _checkpointMarker(
+            point: toLatLng(checkpoints[i]),
+            name: i < state.orderedNodes.length
+                ? state.orderedNodes[i].name
+                : null,
+            emphasized:
+                i < state.orderedNodes.length &&
+                state.emphasizedNodeIds.contains(state.orderedNodes[i].id),
+            isStart: i == 0,
+            isEnd: i == lastIndex,
+          ),
+        if (state.markerPosition != null) _currentPositionMarker(),
+      ];
+    }
     return MarkerLayer(markers: markers);
+  }
+
+  /// The current-position marker (rides the road by the progress fraction — AC-5).
+  Marker _currentPositionMarker() {
+    return Marker(
+      point: toLatLng(state.markerPosition!),
+      width: 22,
+      height: 22,
+      child: Semantics(
+        label: 'Your current position on the route',
+        child: const _CurrentPositionMarker(),
+      ),
+    );
+  }
+
+  /// Builds one checkpoint [Marker], sized + styled by its tier (route-real-road
+  /// / AC-2/AC-3). [emphasized] → the big prominent marker; otherwise the small
+  /// grey pass-through dot. The semantic label names the role (Start / Destination
+  /// / Stop / passing-through) so the tier is recoverable non-visually (NFR-3).
+  Marker _checkpointMarker({
+    required LatLng point,
+    required String? name,
+    required bool emphasized,
+    required bool isStart,
+    required bool isEnd,
+  }) {
+    final displayName = name ?? 'checkpoint';
+    final String semanticLabel;
+    if (isStart) {
+      semanticLabel = 'Start: $displayName';
+    } else if (isEnd) {
+      semanticLabel = 'Destination: $displayName';
+    } else if (emphasized) {
+      semanticLabel = 'Stop: $displayName';
+    } else {
+      semanticLabel = 'Passing through $displayName';
+    }
+
+    if (emphasized) {
+      // Big prominent marker. Full-screen carries the name label beneath the dot
+      // (anchored at the top so the dot stays on the road vertex); the minimap
+      // shows a slightly larger bare dot.
+      return Marker(
+        point: point,
+        width: compact ? 16 : 120,
+        height: compact ? 16 : 48,
+        alignment: compact ? Alignment.center : Alignment.topCenter,
+        child: compact
+            ? Semantics(
+                label: semanticLabel,
+                child: const _CheckpointPin(size: 12),
+              )
+            : _CheckpointMarker(name: displayName, semanticLabel: semanticLabel),
+      );
+    }
+
+    // Small grey pass-through dot — clearly smaller than the big markers
+    // (route-real-road / AC-3 "grey marker too big" fix): ~1/3 the big dot's
+    // size. Full-screen keeps a hover tooltip so the province is still
+    // identifiable; the minimap is a bare tiny grey dot. Both keep a Semantics
+    // label so the province stays reachable (NFR-3).
+    final dot = _PassThroughDot(size: compact ? 4 : 6);
+    final labelled = Semantics(label: semanticLabel, child: dot);
+    return Marker(
+      point: point,
+      width: 16,
+      height: 16,
+      alignment: Alignment.center,
+      child: compact ? labelled : Tooltip(message: displayName, child: labelled),
+    );
   }
 
   /// The required in-app CC BY-SA 3.0 credit for the bundled Wikimedia base
@@ -233,17 +406,50 @@ class MapView extends StatelessWidget {
   }
 }
 
-/// A small checkpoint dot.
+/// A prominent (emphasized) checkpoint dot — teal with a white ring. Sized by
+/// [size] so the same pin serves the full-screen big marker and the slightly
+/// larger minimap endpoint/stop dot.
 class _CheckpointPin extends StatelessWidget {
-  const _CheckpointPin();
+  const _CheckpointPin({this.size = 16});
+
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF26A69A),
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: kEmphasizedMarkerColor,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+      ),
+    );
+  }
+}
+
+/// A tiny, muted grey pass-through checkpoint dot (route-real-road / AC-3) — the
+/// de-emphasized style for a province the sweep merely passes through. Clearly
+/// smaller than the emphasized markers (~1/3 their size), so the start/end/stop
+/// markers stand out (the "grey marker too big" regression fix).
+class _PassThroughDot extends StatelessWidget {
+  const _PassThroughDot({this.size = 6});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: kPassThroughGrey,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1),
+        ),
       ),
     );
   }
@@ -256,15 +462,19 @@ class _CheckpointPin extends StatelessWidget {
 /// the top so it stays on the road vertex while the label hangs beneath it.
 /// (Full-screen only — the compact minimap keeps bare dots, unchanged.)
 class _CheckpointMarker extends StatelessWidget {
-  const _CheckpointMarker({required this.name});
+  const _CheckpointMarker({required this.name, required this.semanticLabel});
 
   final String name;
+
+  /// The role-aware label (Start / Destination / Stop …) recovered by a screen
+  /// reader (NFR-3).
+  final String semanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final dot = Semantics(
-      label: 'Checkpoint $name',
-      child: const SizedBox(width: 16, height: 16, child: _CheckpointPin()),
+      label: semanticLabel,
+      child: const _CheckpointPin(size: 20),
     );
     // Desktop hover tooltip naming the stop (macOS / Windows — NFR-3).
     final hoverable = Tooltip(message: name, child: dot);
@@ -325,10 +535,21 @@ class _BaseMapAttribution extends StatelessWidget {
               ),
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Text(
-                  kBaseMapAttribution,
-                  style: TextStyle(color: Colors.white, fontSize: 11),
-                  softWrap: true,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Text(
+                      kBaseMapAttribution,
+                      style: TextStyle(color: Colors.white, fontSize: 11),
+                      softWrap: true,
+                    ),
+                    Text(
+                      kRoadAttribution,
+                      style: TextStyle(color: Colors.white, fontSize: 11),
+                      softWrap: true,
+                    ),
+                  ],
                 ),
               ),
             ),

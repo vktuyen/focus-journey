@@ -369,4 +369,63 @@ void main() {
       expect(cubit.state.idleStretches, isEmpty);
     });
   });
+
+  group('route-real-road — emphasized ids + smoothed road', () {
+    RouteViewState routeStateWithStops(
+      double routeDistanceKm,
+      List<String> markedStopIds,
+    ) {
+      final selection = _selection(chain);
+      final position = RouteProgressResolver.resolve(
+        routeDistanceKm: routeDistanceKm,
+        selection: selection,
+        chain: chain,
+      );
+      return RouteViewState(
+        selection: selection,
+        position: position,
+        cumulativeDistanceKm: routeDistanceKm,
+        markedStopIds: markedStopIds,
+      );
+    }
+
+    test('default full-spine route emphasizes ONLY start + end (AC-3)', () {
+      final cubit = MapCubit(geography: geography);
+      addTearDown(cubit.close);
+      cubit.updateFromRoute(routeStateWithStops(100, const <String>[]));
+      // A → B → C: only the endpoints are big; B is pass-through.
+      expect(cubit.state.emphasizedNodeIds, <String>{'a', 'c'});
+    });
+
+    test('a user-marked stop is added to the emphasized set (AC-4)', () {
+      final cubit = MapCubit(geography: geography);
+      addTearDown(cubit.close);
+      cubit.updateFromRoute(routeStateWithStops(100, const <String>['b']));
+      expect(cubit.state.emphasizedNodeIds, <String>{'a', 'b', 'c'});
+    });
+
+    test('the road is smoothed to more vertices than the checkpoints (AC-1)', () {
+      final cubit = MapCubit(geography: geography);
+      addTearDown(cubit.close);
+      cubit.updateFromRoute(routeStateWithStops(100, const <String>[]));
+      final smoothed = cubit.state.smoothedRoutePolyline.points;
+      expect(smoothed.length, greaterThan(cubit.state.orderedNodes.length));
+    });
+
+    test('the smoothed road + emphasized ids are cached across a tick (NFR-1)', () {
+      final cubit = MapCubit(geography: geography);
+      addTearDown(cubit.close);
+      cubit.updateFromRoute(routeStateWithStops(50, const <String>['b']));
+      final firstSmoothed = cubit.state.smoothedRoutePolyline;
+      final firstEmphasized = cubit.state.emphasizedNodeIds;
+      // A mere distance tick (same route identity) must reuse the cached geometry.
+      cubit.updateFromSnapshot(_snapshot(<ActivitySegment>[]));
+      cubit.updateFromRoute(routeStateWithStops(120, const <String>['b']));
+      expect(
+        identical(cubit.state.smoothedRoutePolyline, firstSmoothed),
+        isTrue,
+      );
+      expect(identical(cubit.state.emphasizedNodeIds, firstEmphasized), isTrue);
+    });
+  });
 }

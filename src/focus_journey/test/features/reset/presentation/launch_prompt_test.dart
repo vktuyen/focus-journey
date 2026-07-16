@@ -50,7 +50,7 @@ class _FakeRouteRepository implements RouteRepository {
   @override
   Future<void> save(RouteSelection s) async => selection = s;
   @override
-  Future<RoutePlan?> loadPlan() async => plan;
+  Future<RoutePlan?> loadPlan({double currentCumulativeKm = 0}) async => plan;
   @override
   Future<void> savePlan(RoutePlan p) async => plan = p;
 }

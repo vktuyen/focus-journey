@@ -11,7 +11,7 @@ The **single** roadmap + "what do I run next" tracker. (This file absorbed the o
 
 ## Where I am right now
 
-_Last updated: 2026-07-15_
+_Last updated: 2026-07-16_
 
 - 🚧 **NEW WAVE — `refine-app-ui-ux` (started 2026-07-15).** Opening slice **`journey-reset` ✅ SHIPPED
   2026-07-15** (dev build, macOS-verified) — in [done/](done/journey-reset.md). Settings factory-reset (full
@@ -23,17 +23,25 @@ _Last updated: 2026-07-15_
 - ✅ **`vietnam-map-fidelity` SHIPPED 2026-07-15** (dev build, macOS-verified) — in [done/](done/vietnam-map-fidelity.md).
   Current 34-province (2026) map: bundled GeoJSON `PolygonLayer` (ADR-0008), single-tone, **OSM tiles dropped →
   ZERO network egress**, CC BY-SA credit. Review resolved (option A) · privacy PASS · tests green (1297/1/0);
-  AC-1..11 + NFR-2 `[x]`. **Sibling `province-chain-2026` is now UNBLOCKED** — rebuilds the journey data model
-  onto the 34 units + fixes the carried route-hugs-coast geometry. **👉 `/new-feature province-chain-2026`.**
+  AC-1..11 + NFR-2 `[x]`. (Also shipped: **`map-bundle-weight`** quick-change — trimmed 2.7 MB of unused
+  source SVGs out of the app bundle.)
+- ✅ **`province-chain-2026` SHIPPED 2026-07-16** — in [done/](done/province-chain-2026.md). Rebuilt the journey
+  province/route **data model** onto all 34 current units (2026 reform) — a coast-hugging great-circle S→N spine,
+  migration-by-reset for retired ids, ADR-0009 ratified. Review approved + privacy PASS; execute-tests **green
+  (285/285)**; AC-1..11 + NFR-1..3 `[x]`.
+- ✅ **`route-real-road` SHIPPED 2026-07-16** — in [done/](done/route-real-road.md). The journey route now follows
+  the **real bundled national highway** (QL1A+QL4A, OSM/ODbL, offline): curved on-land road, big markers ONLY on
+  start/end/user-stops, **detours out to off-highway stops** (An Giang etc.), road-length distance/progress. The
+  authoring **review lists only anchors** (remove-intermediate feature dropped); journey is **paused until a route
+  is confirmed** and **freezes on arrival** (no manual button). "Factory reset" → "Reset everything". Review
+  approved + privacy PASS; execute-tests **green (1481 unit/widget + 18 e2e)**; AC-1..9 + NFR-1..4 `[x]`.
+  **`active/` is now empty.**
 
-### 👉 Immediate next action (2026-07-15)
-**`refine-app-ui-ux` wave: `journey-reset` + `vietnam-map-fidelity` both SHIPPED. `active/` is empty.**
-- **👉 Promote the now-unblocked sibling:** `/new-feature province-chain-2026` — rebuild the journey
-  province/route data model onto the 34 units (+ fix the carried route-hugs-coast geometry). Its `/new-feature`
-  will need `product-domain-expert` + `system-architect` framing (spine on 34 units, distances, migration).
-- **Or harden `journey-reset` follow-ups:** reset-seam ADR (`/add-adr`), drift-guard/NFR static tests,
-  launch-at-startup + copy questions.
-- **Or release-readiness:** burn down the carried on-device / Windows legs across shipped slices.
+### 👉 Immediate next action (2026-07-16)
+**`refine-app-ui-ux` wave: `journey-reset` · `vietnam-map-fidelity` · `province-chain-2026` · `route-real-road` all SHIPPED. `active/` is empty.** All slice work is on branch `feat/journey-reset`, **uncommitted** (staged working tree).
+- **👉 Commit / open a PR** for the shipped `refine-app-ui-ux` work (branch `feat/journey-reset`) when ready — the user drives git per repo policy.
+- **Known carried follow-ups (shipped with residual, user-approved):** off-highway stops use a straight out-and-back **spur** not real secondary roads (future: bundle provincial connectors); `_resetPlan` still seeds the v2 `coastalCorridorNodeIds` (harmless); Cao Bằng north end ~19 km connector; **`system-architect` note**: route-real-road's OSM/ODbL attribution supersedes `vietnam-map-fidelity` AC-9/AC-10 "no OSM credit" → ADR/spec amendment.
+- **Or harden `journey-reset` follow-ups / release-readiness:** reset-seam ADR (`/add-adr`), on-device/Windows legs across shipped slices.
   _(Further UI/UX-refinement slices for this wave: TBD — capture with `/capture-idea`.)_
 
 - ✅ **`visual-polish` epic COMPLETE (2026-06-26)** — Wave 1 `journey-scene-art-v3` · Wave 2
@@ -220,10 +228,11 @@ Theme: refine the app's UI/UX. Promote each slice with `/new-feature <slug>` in 
   journey overlaid. **✅ SHIPPED 2026-07-15** (dev build, macOS-verified) per **ADR-0008** (SVG→GeoJSON
   `PolygonLayer`, single-tone, OSM tiles dropped → **zero egress**, CC BY-SA credit); review resolved (opt A),
   privacy PASS, tests green 1297/1/0; AC-1..11 + NFR-2 `[x]`; in [done/](done/vietnam-map-fidelity.md).
-- **province-chain-2026** — rebuild the journey province/route **data model** onto the 34 current units +
-  centre coordinates + distances (migrate the shipped 13-stop chain; ADR-0005 sub-chains) + fix the carried
-  route-hugs-coast geometry. **📋 Backlog — now UNBLOCKED** `[blocked by: vietnam-map-fidelity ✅]`. Uses the
-  inlined 34-unit dataset. **👉 `/new-feature province-chain-2026`.**
+- **province-chain-2026** — rebuild the journey province/route **data model** onto all 34 current units: one
+  coast-hugging south→north spine through every province (great-circle distances), which also fixes the
+  carried route-hugs-coast limitation. **🚧 ACTIVE — Phase 2 (Spec)**; spec drafted (11 ACs + 3 NFRs), ordering
+  /migration framed → ADR-0009 at build. **✅ approved + test cases designed → 👉 `/implement province-chain-2026`.**
+- **map-bundle-weight** — quick-change: trimmed 2.7 MB of unused source SVGs out of the app bundle. **✅ SHIPPED 2026-07-15** — in [done/](done/map-bundle-weight.md).
 - _Further UI/UX slices: TBD — `/capture-idea <slug>` as defined._
 
 ### Now (history) — Wave 2 (v2), STARTED 2026-06-24

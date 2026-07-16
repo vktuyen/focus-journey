@@ -49,9 +49,17 @@ void main() {
       expect(sum, closeTo(fixture.totalChainKm, kTol));
     });
 
-    test('production chain sums to ~2000 and has ~10-15 nodes', () {
-      expect(vietnamProvinceChain.totalChainKm, closeTo(2000, kTol));
-      expect(vietnamProvinceChain.nodes.length, inInclusiveRange(10, 15));
+    test('production chain has 34 nodes and a derived great-circle total', () {
+      // province-chain-2026: 34 current units; total is the summed 33
+      // great-circle segments (~2500..3500 km), not the retired stylized 2000.
+      expect(vietnamProvinceChain.nodes.length, 34);
+      final sum = vietnamProvinceChain.segmentsKm.fold<double>(
+        0,
+        (a, b) => a + b,
+      );
+      expect(vietnamProvinceChain.totalChainKm, closeTo(sum, kTol));
+      expect(vietnamProvinceChain.totalChainKm, greaterThan(2500));
+      expect(vietnamProvinceChain.totalChainKm, lessThan(3500));
       expect(vietnamProvinceChain.segmentsKm.every((s) => s > 0), isTrue);
     });
 

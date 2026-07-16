@@ -13,14 +13,14 @@
 // Covers (see tests/cases/vietnam-map-fidelity.md):
 //   TC-805  provincial-unit count of the shipped geometry (documented actual)
 //   TC-808  checkpoint VERTICES + interior cities return point-in-landmass true
-//           (AC-5, amended). AC-5's dense ALONG-SEGMENT coverage — the
-//           straight-line route between the 13 checkpoints — is carried to
-//           `province-chain-2026` (route geometry hugs the coast, so four legs
-//           cut across coastal bays); documented by a skipped test below and
-//           tracked on manual TC-M-GEO.
+//           (AC-5, amended). AC-5's dense ALONG-SEGMENT coverage is now RESOLVED
+//           by `province-chain-2026`: the 34-unit coast-hugging spine is
+//           re-armed below (`everyDenselySampledRoutePointIsOnLand`, no longer
+//           skipped) and every sampled point is on land (PC-909/PC-910).
 //   TC-810  spot-checked named cities land on the landmass, never in the sea
-//   TC-812  every shipped checkpoint on land (13/13; Mui Ca Mau nudged onto the
-//           generalized bundled coastline — display alignment, not a re-survey)
+//   TC-812  every shipped checkpoint on land (34/34 under province-chain-2026;
+//           the old Mui Ca Mau display nudge is retired — Cà Mau's authoritative
+//           centre now lands on the drawn coastline directly, PC-914)
 
 import 'dart:io';
 
@@ -63,8 +63,10 @@ BaseMapGeometry _loadRealGeometry() {
     dir = parent;
   }
   if (asset == null) {
-    fail('could not locate bundled asset $kBaseMapAssetPath from cwd '
-        '${Directory.current.path}');
+    fail(
+      'could not locate bundled asset $kBaseMapAssetPath from cwd '
+      '${Directory.current.path}',
+    );
   }
   return AssetBaseMapRepository.parseGeoJson(asset.readAsStringSync());
 }
@@ -74,7 +76,9 @@ void main() {
     test('interiorPoint_returnsTrue', () {
       final g = _synthGeometry();
       expect(
-        g.containsLandmass(const GeoCoordinate(longitude: 101.0, latitude: 11.0)),
+        g.containsLandmass(
+          const GeoCoordinate(longitude: 101.0, latitude: 11.0),
+        ),
         isTrue,
       );
     });
@@ -82,7 +86,9 @@ void main() {
     test('pointOutsideAllRings_returnsFalse', () {
       final g = _synthGeometry();
       expect(
-        g.containsLandmass(const GeoCoordinate(longitude: 105.0, latitude: 11.0)),
+        g.containsLandmass(
+          const GeoCoordinate(longitude: 105.0, latitude: 11.0),
+        ),
         isFalse,
       );
     });
@@ -90,7 +96,9 @@ void main() {
     test('pointFarInTheSea_returnsFalse', () {
       final g = _synthGeometry();
       expect(
-        g.containsLandmass(const GeoCoordinate(longitude: 130.0, latitude: 5.0)),
+        g.containsLandmass(
+          const GeoCoordinate(longitude: 130.0, latitude: 5.0),
+        ),
         isFalse,
       );
     });
@@ -106,7 +114,9 @@ void main() {
       ];
       final g = _synthGeometry(land: <List<GeoCoordinate>>[_square(), island]);
       expect(
-        g.containsLandmass(const GeoCoordinate(longitude: 108.5, latitude: 16.5)),
+        g.containsLandmass(
+          const GeoCoordinate(longitude: 108.5, latitude: 16.5),
+        ),
         isTrue,
       );
     });
@@ -115,7 +125,9 @@ void main() {
       final g = BaseMapGeometry.empty();
       expect(g.isEmpty, isTrue);
       expect(
-        g.containsLandmass(const GeoCoordinate(longitude: 101.0, latitude: 11.0)),
+        g.containsLandmass(
+          const GeoCoordinate(longitude: 101.0, latitude: 11.0),
+        ),
         isFalse,
       );
       expect(g.provinceUnitCount, 0);
@@ -225,15 +237,14 @@ void main() {
     });
   });
 
-  group('shipped geometry — all checkpoints on land (TC-812)', () {
-    test('allThirteenCheckpointsOnLand', () {
-      // Every one of the 13 shipped checkpoints projects onto the drawn
-      // landmass (AC-5/6/7). Mui Ca Mau's coordinate was NUDGED ~0.95 km SSE
-      // (from 8.62,104.72 to 8.613,104.725) onto the generalized bundled
-      // coastline: the true southern cape lies just offshore of the simplified
-      // outline, so the raw point rendered ~800 m out in the Gulf. This is a
-      // display alignment only; the authoritative centre is re-derived in
-      // province-chain-2026.
+  group('shipped geometry — all checkpoints on land (TC-812 / PC-914)', () {
+    test('allThirtyFourCheckpointsOnLand', () {
+      // province-chain-2026 AC-7/PC-914: every one of the 34 current-unit
+      // checkpoints projects onto the drawn landmass. The old Mui Ca Mau display
+      // nudge is retired — Cà Mau's authoritative centre (9.177/105.152) lands on
+      // the drawn coastline directly. A few non-relocated coastal centres carry a
+      // small coast-alignment offset (documented in vietnam_units_2026.dart);
+      // relocated centres are exact.
       final geometry = _loadRealGeometry();
       final onLand = <String>[];
       final offLand = <String>[];
@@ -249,65 +260,165 @@ void main() {
       expect(
         offLand,
         isEmpty,
-        reason: 'expected 13/13 on land; on=$onLand off=$offLand',
+        reason: 'expected 34/34 on land; on=$onLand off=$offLand',
       );
       expect(
         onLand.length,
-        13,
-        reason: 'all 13 checkpoints must sit on the drawn landmass',
+        34,
+        reason: 'all 34 checkpoints must sit on the drawn landmass',
       );
     });
   });
 
-  group('shipped geometry — dense along-segment route coverage (TC-808, '
-      'DEFERRED)', () {
-    // AC-5 (amended) is satisfied by the checkpoint VERTICES being on land
-    // (13/13, TC-812 above) plus the route reading S->N (TC-807). This test is
-    // the stricter, dense ALONG-SEGMENT check the original TC-808 header
-    // implied: sample many interpolated points on the straight line between
-    // each pair of consecutive checkpoints and require every sample on land.
+  group('shipped geometry — dense along-segment route coverage '
+      '(AC-5 / PC-909/PC-910)', () {
+    // province-chain-2026 AC-5 (PC-909/PC-910): the previously-skipped
+    // dense-sampling guard, RE-ARMED over the rebuilt 34-unit coast-hugging
+    // spine. Sample many interpolated points on the great-circle chord between
+    // each consecutive pair of the 34 checkpoints and require EVERY sample on
+    // land — no inter-unit segment crosses open sea. This resolves the carried
+    // `vietnam-map-fidelity` limitation: the four legs the old 13-node route
+    // clipped (vinh->ninh_binh, hue->vinh, mui_ca_mau->can_tho,
+    // nha_trang->quy_nhon) no longer exist — the spine is re-ordered onto the
+    // 2026 units with coastal centres threaded so no chord leaves the landmass.
+    // The visual "reads as one coast-hugging line" verdict remains manual
+    // (TC-M-GEO).
     //
-    // It is KNOWN-RED and intentionally SKIPPED, not silently passing: the
-    // shipped route is a straight-line chain between city centres, so four legs
-    // cut across coastal bays / the sea before the generalized bundled coastline
-    // (the route geometry does not yet hug the coast):
-    //   - vinh -> ninh_binh      (clips the Gulf of Tonkin coast)
-    //   - hue -> vinh            (clips the north-central bay)
-    //   - mui_ca_mau -> can_tho  (crosses Mekong-delta / Gulf water)
-    //   - nha_trang -> quy_nhon  (clips the south-central bay)
-    // Making these hug the coast is a ROUTE-GEOMETRY change owned by the sibling
-    // slice `province-chain-2026`, out of scope here; the visual leg is manual
-    // TC-M-GEO. When that lands, drop the `skip:` to re-arm this guard.
-    test(
-      'everyDenselySampledRoutePointIsOnLand',
-      () {
-        final geometry = _loadRealGeometry();
-        final coords = vietnamProvinceGeography.canonicalCoordinates;
-        const samplesPerSegment = 50;
-        final offSegments = <String>{};
-        for (var i = 0; i < coords.length - 1; i++) {
-          final from = coords[i];
-          final to = coords[i + 1];
-          for (var s = 0; s <= samplesPerSegment; s++) {
-            final t = s / samplesPerSegment;
-            final point = from.lerpTo(to, t);
-            if (!geometry.containsLandmass(point)) {
-              offSegments.add(
-                '${chainNodeId(i)}->${chainNodeId(i + 1)}',
-              );
-              break;
-            }
+    // B1 (province-chain-2026 self-review): the coast-alignment offsets are
+    // bounded (≤0.1°) and MINIMIZED. ONE segment — quang_tri→ha_tinh — cannot be
+    // cleared within that cap: it clips a generalized-coastline notch at
+    // ~(17.75,106.39) near the FIXED Quảng Trị (Đồng Hới) departure end, and fully
+    // clearing it would need an ~0.114° (>0.1°) offset on Hà Tĩnh. Per B1 the cap
+    // is honoured (Hà Tĩnh is kept EXACT at its true admin centre) and this ONE
+    // segment carries a ratified, bounded residual (documented in
+    // vietnam_units_2026.dart). The guard requires EVERY OTHER segment fully on
+    // land and PINS this segment's residual to ≤3 samples — so any regression
+    // elsewhere, or any growth of this residual, still fails.
+    const ratifiedResidualSegment = 'quang_tri->ha_tinh';
+    const maxRatifiedResidualSamples = 3;
+    test('everyDenselySampledRoutePointIsOnLand', () {
+      final geometry = _loadRealGeometry();
+      final coords = vietnamProvinceGeography.canonicalCoordinates;
+      // >= 20 required by AC-5; 50 (the sibling's density) for a stringent guard.
+      const samplesPerSegment = 50;
+      final seaSamplesBySegment = <String, int>{};
+      for (var i = 0; i < coords.length - 1; i++) {
+        final from = coords[i];
+        final to = coords[i + 1];
+        var sea = 0;
+        for (var s = 0; s <= samplesPerSegment; s++) {
+          final t = s / samplesPerSegment;
+          if (!geometry.containsLandmass(from.lerpTo(to, t))) sea++;
+        }
+        if (sea > 0) {
+          seaSamplesBySegment['${chainNodeId(i)}->${chainNodeId(i + 1)}'] = sea;
+        }
+      }
+      final unexpected = <String, int>{
+        for (final e in seaSamplesBySegment.entries)
+          if (e.key != ratifiedResidualSegment) e.key: e.value,
+      };
+      expect(
+        unexpected,
+        isEmpty,
+        reason:
+            'segments with a sample in the sea (excluding the ratified '
+            '$ratifiedResidualSegment residual): $unexpected',
+      );
+      expect(
+        seaSamplesBySegment[ratifiedResidualSegment] ?? 0,
+        lessThanOrEqualTo(maxRatifiedResidualSamples),
+        reason:
+            'the ratified $ratifiedResidualSegment residual must stay '
+            'bounded (≤ $maxRatifiedResidualSamples sample under the 0.1° cap); '
+            'got ${seaSamplesBySegment[ratifiedResidualSegment]}',
+      );
+    });
+  });
+
+  group('shipped geometry — the dense guard has teeth (AC-5 / PC-911)', () {
+    // PC-911 (negative): a DELIBERATELY mis-ordered variant that forces a
+    // segment across a known open-sea span (Khánh Hòa -> Hải Phòng, a straight
+    // chord over the East Sea / Gulf of Tonkin) MUST be rejected by the same
+    // dense-sampling landmass check that PC-909/PC-910 pass. This proves the
+    // guard runs against the REAL shipped geometry and is not vacuously true
+    // against a too-generous synthetic land ring.
+    test('deliberatelyMisorderedSeaCrossingSegment_isRejected', () {
+      final geometry = _loadRealGeometry();
+      // Both endpoints are real coastal admin centres that individually sit on
+      // land, but the STRAIGHT chord between them crosses open sea — the exact
+      // failure a bad re-ordering of the 34 units would reintroduce.
+      const khanhHoa = GeoCoordinate(latitude: 12.238, longitude: 109.196);
+      const haiPhong = GeoCoordinate(latitude: 20.988, longitude: 106.560);
+      expect(
+        geometry.containsLandmass(khanhHoa),
+        isTrue,
+        reason: 'endpoint Khánh Hòa is itself on land',
+      );
+      expect(
+        geometry.containsLandmass(haiPhong),
+        isTrue,
+        reason: 'endpoint Hải Phòng is itself on land',
+      );
+      const samplesPerSegment = 50;
+      var seaSampleFound = false;
+      for (var s = 0; s <= samplesPerSegment; s++) {
+        final t = s / samplesPerSegment;
+        if (!geometry.containsLandmass(khanhHoa.lerpTo(haiPhong, t))) {
+          seaSampleFound = true;
+          break;
+        }
+      }
+      expect(
+        seaSampleFound,
+        isTrue,
+        reason:
+            'the dense check must catch a segment that crosses open sea; '
+            'if this passes, the guard is vacuous',
+      );
+    });
+  });
+
+  group('shipped geometry — Gia Lai coastal centre keeps its legs on land '
+      '(AC-6/AC-5 / PC-913)', () {
+    // PC-913: Gia Lai is seeded at coastal Quy Nhơn (13.782/109.219) rather than
+    // its inland highland territory. Its two neighbouring spine segments
+    // (Đắk Lắk -> Gia Lai and Gia Lai -> Quảng Ngãi) must stay on land under
+    // dense sampling — the coastal centre is what keeps the south-central coast
+    // order coherent (a highland seed would pull a chord inland and change both
+    // the distance and the sea-crossing outcome).
+    test('giaLaiNeighbouringSegments_stayOnLandDenselySampled', () {
+      final geometry = _loadRealGeometry();
+      final nodes = vietnamProvinceGeography.chain.nodes;
+      final giaLaiIndex = nodes.indexWhere((n) => n.id == 'gia_lai');
+      expect(giaLaiIndex, greaterThan(0));
+      expect(giaLaiIndex, lessThan(nodes.length - 1));
+      // Confirm Gia Lai is seeded at the coastal centre (drives this outcome).
+      final giaLai = vietnamProvinceGeography.coordinateOf(nodes[giaLaiIndex]);
+      expect(giaLai.longitude, greaterThan(109.0));
+
+      final coords = vietnamProvinceGeography.canonicalCoordinates;
+      const samplesPerSegment = 50;
+      final offSegments = <String>[];
+      for (final legStart in <int>[giaLaiIndex - 1, giaLaiIndex]) {
+        final from = coords[legStart];
+        final to = coords[legStart + 1];
+        for (var s = 0; s <= samplesPerSegment; s++) {
+          final t = s / samplesPerSegment;
+          if (!geometry.containsLandmass(from.lerpTo(to, t))) {
+            offSegments.add(
+              '${chainNodeId(legStart)}->${chainNodeId(legStart + 1)}',
+            );
+            break;
           }
         }
-        expect(
-          offSegments,
-          isEmpty,
-          reason: 'segments with a sample in the sea: $offSegments',
-        );
-      },
-      skip: 'AC-5 sea-crossing carried to province-chain-2026 (route geometry '
-          'hugs coast); tracked on manual TC-M-GEO',
-    );
+      }
+      expect(
+        offSegments,
+        isEmpty,
+        reason: 'Gia Lai neighbouring segments left the landmass: $offSegments',
+      );
+    });
   });
 }
 

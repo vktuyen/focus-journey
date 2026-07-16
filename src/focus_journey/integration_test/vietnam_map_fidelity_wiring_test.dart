@@ -214,7 +214,13 @@ void main() {
 
       expect(baseMapPresent(tester), isTrue);
       expect(find.byType(TileLayer), findsNothing);
-      expect(find.textContaining('OpenStreetMap'), findsNothing);
+      // Assertion updated for route-real-road: the bundled QL1A national road is
+      // OSM data under ODbL, so NFR-4 now MANDATES the ODbL road attribution be
+      // shown on the full map (the kRoadAttribution line of the _BaseMapAttribution
+      // pill). This supersedes vietnam-map-fidelity's original "no OSM credit"
+      // expectation. This is a static text credit, not a tile fetch — the
+      // no-TileLayer / no-network privacy invariant above still holds.
+      expect(find.textContaining('OpenStreetMap contributors'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -312,7 +318,13 @@ void main() {
       expect(find.text(kBaseMapAttribution), findsOneWidget);
       expect(find.textContaining('CC BY-SA'), findsOneWidget);
       expect(find.byType(TileLayer), findsNothing);
-      expect(find.textContaining('OpenStreetMap'), findsNothing);
+      // Assertion updated for route-real-road: the bundled QL1A national road is
+      // OSM data under ODbL, so NFR-4 now MANDATES the ODbL road attribution be
+      // shown on the full map (the kRoadAttribution line of the _BaseMapAttribution
+      // pill). This supersedes vietnam-map-fidelity's original "no OSM credit"
+      // expectation. This is a static text credit, not a tile fetch — the
+      // no-TileLayer / no-network privacy invariant above still holds.
+      expect(find.textContaining('OpenStreetMap contributors'), findsOneWidget);
     });
   });
 }
@@ -330,7 +342,7 @@ class _NullRepo implements RouteRepository {
   Future<void> save(RouteSelection selection) async => _stored = selection;
 
   @override
-  Future<RoutePlan?> loadPlan() async => _storedPlan;
+  Future<RoutePlan?> loadPlan({double currentCumulativeKm = 0}) async => _storedPlan;
 
   @override
   Future<void> savePlan(RoutePlan plan) async => _storedPlan = plan;

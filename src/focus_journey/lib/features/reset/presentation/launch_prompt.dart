@@ -15,8 +15,10 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../journey/presentation/journey_gate_cubit.dart';
 import '../../route/domain/province_chain.dart';
 import '../../route/domain/province_geography.dart';
+import '../../route/domain/road_path.dart';
 import '../../route/presentation/map_surface.dart' show RouteStartVehiclePicker;
 import '../../route/presentation/route_planner_flow.dart';
 import '../../route/presentation/route_progress_cubit.dart';
@@ -30,13 +32,23 @@ import 'reset_copy.dart';
 class LaunchPrompt extends StatelessWidget {
   /// Creates the prompt over the full [chain] / [geography] (for authoring on
   /// Start over).
-  const LaunchPrompt({required this.chain, required this.geography, super.key});
+  const LaunchPrompt({
+    required this.chain,
+    required this.geography,
+    this.road,
+    super.key,
+  });
 
   /// The full spine (for the Start over authoring flow).
   final ProvinceChain chain;
 
   /// The static geography (for the Start over authoring flow).
   final ProvinceGeography geography;
+
+  /// The bundled national road (route-real-road), forwarded to the Start over
+  /// authoring flow so its review distance reflects the REAL road length. `null`
+  /// (tests / degraded mode) falls back to the sub-chain km.
+  final RoadPath? road;
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +103,12 @@ class LaunchPrompt extends StatelessWidget {
   /// Opens route authoring; on confirm, abandons the current route via the
   /// SHIPPED ADR-0005 path and dismisses the prompt onto the new route (AC-9).
   Future<void> _startOver(BuildContext context) async {
-    await showStartOverAuthoring(context, chain: chain, geography: geography);
+    await showStartOverAuthoring(
+      context,
+      chain: chain,
+      geography: geography,
+      road: road,
+    );
   }
 }
 
@@ -108,35 +125,57 @@ Future<void> showStartOverAuthoring(
   BuildContext context, {
   required ProvinceChain chain,
   required ProvinceGeography geography,
+  RoadPath? road,
 }) async {
   final RouteProgressCubit routeCubit = context.read<RouteProgressCubit>();
   final LaunchGateCubit gateCubit = context.read<LaunchGateCubit>();
   // Re-provide the SAME SettingsCubit into the dialog subtree (the root
   // navigator does not inherit it) so the cosmetic vehicle pick has one source.
   final SettingsCubit settingsCubit = context.read<SettingsCubit>();
-  await showDialog<void>(
-    context: context,
-    builder: (BuildContext dialogContext) => BlocProvider<SettingsCubit>.value(
-      value: settingsCubit,
-      child: Dialog(
-        child: SingleChildScrollView(
-          child: RoutePlannerFlow(
-            chain: chain,
-            geography: geography,
-            onConfirmed: (resolved) {
-              // Abandon the current route (new offset over the never-reset
-              // engine distance) and travel the newly authored one (AC-9).
-              routeCubit.abandonAndStartNew(resolved);
-              // Only NOW dismiss the prompt — onto the new active route.
-              gateCubit.dismissAfterStartOver();
-              Navigator.of(dialogContext).pop();
-            },
-            // Cancel: nothing recorded, current route + prompt untouched (AC-8).
-            onCancelled: () => Navigator.of(dialogContext).pop(),
-            vehiclePicker: RouteStartVehiclePicker.maybeFor(dialogContext),
+  // route-real-road: pause the still-active route while re-authoring so it does
+  // not accrue during setup; resume on close (cancel keeps the old route,
+  // confirm starts the new one via onRouteStarted). Defensive for route-only
+  // test hosts that mount no journey gate.
+  JourneyGateCubit? journeyGate;
+  try {
+    journeyGate = context.read<JourneyGateCubit>();
+  } on ProviderNotFoundException {
+    journeyGate = null;
+  }
+  journeyGate?.beginAuthoring();
+  try {
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) =>
+          BlocProvider<SettingsCubit>.value(
+            value: settingsCubit,
+            child: Dialog(
+              child: SingleChildScrollView(
+                child: RoutePlannerFlow(
+                  chain: chain,
+                  geography: geography,
+                  road: road,
+                  onConfirmed: (resolved) {
+                    // Abandon the current route (new offset over the never-reset
+                    // engine distance) and travel the newly authored one (AC-9).
+                    routeCubit.abandonAndStartNew(resolved);
+                    // Only NOW dismiss the prompt — onto the new active route.
+                    gateCubit.dismissAfterStartOver();
+                    Navigator.of(dialogContext).pop();
+                  },
+                  // Cancel: nothing recorded, current route + prompt untouched.
+                  onCancelled: () => Navigator.of(dialogContext).pop(),
+                  vehiclePicker: RouteStartVehiclePicker.maybeFor(dialogContext),
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
-    ),
-  );
+    );
+  } finally {
+    // Always resume the (still-active on cancel, or newly-confirmed) route, even
+    // if the authoring dialog threw — otherwise the gate would be stuck paused
+    // with no manual control to recover. Idempotent with onRouteStarted, and a
+    // no-op if the gate was torn down mid-authoring.
+    journeyGate?.endAuthoring();
+  }
 }

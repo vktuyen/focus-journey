@@ -282,7 +282,12 @@ void main() {
         origin.latitude,
         origin.longitude,
       );
-      expect(projector.routeLengthKm, closeTo(2000, kTol));
+      // Full south→north route length = the derived great-circle total
+      // (province-chain-2026), not the retired stylized 2000 km.
+      expect(
+        projector.routeLengthKm,
+        closeTo(vietnamProvinceChain.totalChainKm, kTol),
+      );
     });
 
     test('production_southFromHaGiang_marker0IsNorthTip (AC-5)', () {
@@ -299,7 +304,10 @@ void main() {
         origin.latitude,
         origin.longitude,
       );
-      expect(projector.routeLengthKm, closeTo(2000, kTol));
+      expect(
+        projector.routeLengthKm,
+        closeTo(vietnamProvinceChain.totalChainKm, kTol),
+      );
     });
   });
 

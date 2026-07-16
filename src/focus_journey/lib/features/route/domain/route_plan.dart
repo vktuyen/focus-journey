@@ -55,6 +55,7 @@ class RoutePlan extends Equatable {
     required this.orderedNodeIds,
     required this.routeStartOffsetKm,
     this.lifecycle = RouteLifecycle.active,
+    this.markedStopIds = const <String>[],
   });
 
   /// Builds a plan from a resolver-produced [ResolvedRoute] (the authored sub-
@@ -69,6 +70,7 @@ class RoutePlan extends Equatable {
       orderedNodeIds: List<String>.unmodifiable(resolved.orderedNodeIds),
       routeStartOffsetKm: routeStartOffsetKm,
       lifecycle: lifecycle,
+      markedStopIds: List<String>.unmodifiable(resolved.markedStopIds),
     );
   }
 
@@ -84,6 +86,14 @@ class RoutePlan extends Equatable {
   /// The route's lifecycle (ADR-0005 decision 5).
   final RouteLifecycle lifecycle;
 
+  /// The ids of the checkpoints the user explicitly marked as stops (route-real-
+  /// road / AC-4) — the user's extra via-points, a subset of [orderedNodeIds].
+  /// Persisted so a restored route re-shows them as big markers. ADDITIVE +
+  /// back-compat: an older persisted plan without this field decodes to an empty
+  /// list (no crash). A default/migrated full-spine plan has none (AC-3), so only
+  /// the start + end render big.
+  final List<String> markedStopIds;
+
   /// Whether the route is the live, in-progress one.
   bool get isActive => lifecycle == RouteLifecycle.active;
 
@@ -95,11 +105,13 @@ class RoutePlan extends Equatable {
 
   /// Returns a copy with a new [lifecycle] (the only mutable field — used when
   /// completion is latched (AC-8) or the route is abandoned (AC-10)).
-  RoutePlan copyWith({RouteLifecycle? lifecycle}) => RoutePlan(
-    orderedNodeIds: orderedNodeIds,
-    routeStartOffsetKm: routeStartOffsetKm,
-    lifecycle: lifecycle ?? this.lifecycle,
-  );
+  RoutePlan copyWith({RouteLifecycle? lifecycle, List<String>? markedStopIds}) =>
+      RoutePlan(
+        orderedNodeIds: orderedNodeIds,
+        routeStartOffsetKm: routeStartOffsetKm,
+        lifecycle: lifecycle ?? this.lifecycle,
+        markedStopIds: markedStopIds ?? this.markedStopIds,
+      );
 
   /// Re-derives this plan's [ResolvedRoute] (sub-chain + sub-geography +
   /// canonical origin) over the full [chain] / [geography] (ADR-0005 decision 1).
@@ -109,6 +121,7 @@ class RoutePlan extends Equatable {
       fullChain: chain,
       fullGeography: geography,
       orderedNodeIds: orderedNodeIds,
+      markedStopIds: markedStopIds,
     );
   }
 
@@ -144,6 +157,7 @@ class RoutePlan extends Equatable {
     'orderedNodeIds': orderedNodeIds,
     'routeStartOffsetKm': routeStartOffsetKm,
     'lifecycle': lifecycle.name,
+    'markedStopIds': markedStopIds,
   };
 
   /// Reconstructs a plan from [toJson]'s output. Degrades safely (mirrors
@@ -173,10 +187,21 @@ class RoutePlan extends Equatable {
       );
     }
     final lifecycle = _lifecycleByName(json['lifecycle']);
+    // ADDITIVE + back-compat: a plan persisted before route-real-road has no
+    // 'markedStopIds' key → decodes to an empty list (no crash — AC-4). A present
+    // list keeps only its string ids; a non-list or non-string entry is ignored
+    // rather than throwing (a stray marked stop only de-emphasizes a marker).
+    final rawMarked = json['markedStopIds'];
+    final markedStopIds = <String>[
+      if (rawMarked is List)
+        for (final id in rawMarked)
+          if (id is String) id,
+    ];
     return RoutePlan(
       orderedNodeIds: List<String>.unmodifiable(ids),
       routeStartOffsetKm: offset.toDouble(),
       lifecycle: lifecycle,
+      markedStopIds: List<String>.unmodifiable(markedStopIds),
     );
   }
 
@@ -194,5 +219,6 @@ class RoutePlan extends Equatable {
     orderedNodeIds,
     routeStartOffsetKm,
     lifecycle,
+    markedStopIds,
   ];
 }
