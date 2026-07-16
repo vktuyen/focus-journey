@@ -1,6 +1,6 @@
 # ADR-0004: OSM map tiles (first network egress) + canonical-km distance→polyline projection
 
-- Status: accepted
+- Status: accepted (part (a) tile-egress **amended by ADR-0008** — OSM `TileLayer` dropped, egress → 0; part (b) canonical-km projection axis unchanged, but its **source is amended by ADR-0009** — derived great-circle distances over the 34-unit chain instead of hand-authored ~2000 km literals)
 - Date: 2026-06-24
 - Deciders: Kevin (Tuyen Vo) / system-architect
 
@@ -42,6 +42,12 @@ The `map-experience` slice folds the standalone Map tab into the journey tab and
   narrative (see ITEM 2 overview update).
 
 ### (b) Decision A — canonical-km distance→polyline projection.
+
+> **Amended by ADR-0009.** The projection *axis* below is preserved unchanged, but its **source** is amended:
+> `province-chain-2026` rebuilds the chain onto Vietnam's 34 current units and derives `segmentsKm` /
+> `totalChainKm` as **great-circle (haversine) distances** (new total ~2500–3500 km, not the locked ~2000),
+> with `kmPerActiveHour` re-derived from that total. The single canonical-km axis and one geography model
+> still hold.
 
 The curated `ProvinceChain.segmentsKm` chain (the engine's locked ~2000 km total) **remains the single
 canonical distance axis.** Province checkpoints are placed at their **real lat/long**, and a `routeDistanceKm`

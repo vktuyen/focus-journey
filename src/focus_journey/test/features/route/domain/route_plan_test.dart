@@ -40,6 +40,72 @@ void main() {
     });
   });
 
+  group('markedStopIds — additive field (route-real-road / AC-4)', () {
+    test('defaults to empty on a full-spine plan (AC-3)', () {
+      const plan = RoutePlan(
+        orderedNodeIds: <String>['can_tho', 'da_lat', 'da_nang'],
+        routeStartOffsetKm: 0,
+      );
+      expect(plan.markedStopIds, isEmpty);
+    });
+
+    test('survives a toJson → fromJson round-trip', () {
+      const plan = RoutePlan(
+        orderedNodeIds: <String>['can_tho', 'da_lat', 'da_nang'],
+        routeStartOffsetKm: 0,
+        markedStopIds: <String>['da_lat'],
+      );
+      final restored = RoutePlan.fromJson(plan.toJson());
+      expect(restored.markedStopIds, <String>['da_lat']);
+      expect(restored, plan); // Equatable includes markedStopIds.
+    });
+
+    test('a legacy blob WITHOUT the field decodes to empty (back-compat)', () {
+      // The exact shape a pre-route-real-road build persisted (no markedStopIds).
+      final legacy = <String, dynamic>{
+        'orderedNodeIds': <String>['can_tho', 'da_lat', 'da_nang'],
+        'routeStartOffsetKm': 0,
+        'lifecycle': 'active',
+      };
+      final restored = RoutePlan.fromJson(legacy);
+      expect(restored.markedStopIds, isEmpty);
+      expect(restored.orderedNodeIds, <String>['can_tho', 'da_lat', 'da_nang']);
+    });
+
+    test('a non-list markedStopIds decodes to empty (no crash)', () {
+      final blob = <String, dynamic>{
+        'orderedNodeIds': <String>['can_tho', 'da_nang'],
+        'routeStartOffsetKm': 0,
+        'lifecycle': 'active',
+        'markedStopIds': 'da_lat', // wrong type — ignored, not thrown.
+      };
+      expect(RoutePlan.fromJson(blob).markedStopIds, isEmpty);
+    });
+
+    test('copyWith replaces markedStopIds', () {
+      const plan = RoutePlan(
+        orderedNodeIds: <String>['can_tho', 'da_lat', 'da_nang'],
+        routeStartOffsetKm: 0,
+        markedStopIds: <String>['da_lat'],
+      );
+      expect(plan.copyWith().markedStopIds, <String>['da_lat']);
+      expect(
+        plan.copyWith(markedStopIds: const <String>[]).markedStopIds,
+        isEmpty,
+      );
+    });
+
+    test('toResolved threads markedStopIds through to the ResolvedRoute', () {
+      const plan = RoutePlan(
+        orderedNodeIds: <String>['can_tho', 'da_lat', 'da_nang'],
+        routeStartOffsetKm: 0,
+        markedStopIds: <String>['da_lat'],
+      );
+      final resolved = plan.toResolved(chain, geography);
+      expect(resolved.markedStopIds, <String>['da_lat']);
+    });
+  });
+
   group('corrupt-safe fromJson throws FormatException', () {
     test('missing ids', () {
       expect(

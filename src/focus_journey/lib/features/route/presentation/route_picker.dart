@@ -194,9 +194,9 @@ class _RoutePickerState extends State<RoutePicker> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Mark cities you care about. We fill in the checkpoints between your '
-            'endpoints automatically; a stop outside that span extends the route '
-            'to include it.',
+            'Mark any cities you want to stop at. The road between your start and '
+            'end is drawn automatically — you don\'t need to add the places in '
+            'between.',
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 8),

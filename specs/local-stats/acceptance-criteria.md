@@ -266,7 +266,7 @@ macOS+Windows — automated via injected fakes here, real-OS device check carrie
   position (% of country, provinces passed); this slice does not re-implement geography.
 - **The POV road scene** — `journey-view` (shipped).
 - **Tray / menu-bar / always-on-top mini-window** — v2 (`mini-window`).
-- **Cloud sync, accounts, leaderboards, push notifications** — no network in v1; leaderboard is v2/v3.
+- **Cloud sync, accounts, leaderboards, push notifications** — no network; not planned (local single-user product).
   Notifications here are **local OS toasts only**.
 - **Per-mode speeds / energy** — v2 (`journey-energy-model`). v1 is speed-only; `mode` is cosmetic.
 - **Configurable streak threshold / per-mode goals** — v1 uses the locked **25-min raw-active** rule and a

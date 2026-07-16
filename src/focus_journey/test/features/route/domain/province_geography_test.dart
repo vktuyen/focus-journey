@@ -172,9 +172,10 @@ void main() {
       }
     });
 
-    test('coversAllThirteenProvinces', () {
-      expect(vietnamProvinceChain.nodes, hasLength(13));
-      expect(vietnamProvinceGeography.canonicalCoordinates, hasLength(13));
+    test('coversAllThirtyFourUnits', () {
+      // province-chain-2026 AC-1: one coordinate per current 2026 unit.
+      expect(vietnamProvinceChain.nodes, hasLength(34));
+      expect(vietnamProvinceGeography.canonicalCoordinates, hasLength(34));
     });
 
     test('everyCoordinateSitsInsideTheVietnamBbox', () {
@@ -194,7 +195,8 @@ void main() {
 
     test('canonicalCoordinates_traceSouthTipToNorthTip', () {
       final coords = vietnamProvinceGeography.canonicalCoordinates;
-      // Mũi Cà Mau (~8.6 N) is the south tip; Hà Giang (~22.8 N) the north tip.
+      // Cà Mau (~9.18 N) is the south tip; Cao Bằng (~22.67 N), the max-latitude
+      // current unit, is the north tip (the old Hà Giang terminus is retired).
       expect(coords.first.latitude, lessThan(coords.last.latitude));
       expect(coords.first.latitude, lessThan(10.0));
       expect(coords.last.latitude, greaterThan(22.0));

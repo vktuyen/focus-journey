@@ -41,6 +41,7 @@ class ResolvedRoute {
     required this.subGeography,
     required this.orderedNodes,
     required this.canonicalOriginKm,
+    this.markedStopIds = const <String>[],
   });
 
   /// The derived sub-chain (a smaller [ProvinceChain]) — what the unchanged
@@ -66,6 +67,13 @@ class ResolvedRoute {
   /// completion threshold (AC-5/AC-8). Equal to `subChain.totalChainKm` by
   /// construction (ADR-0005 decision 1).
   double get subPathKm => subChain.totalChainKm;
+
+  /// The ids of the checkpoints the user explicitly marked as stops (route-real-
+  /// road / AC-4). A subset of [orderedNodeIds]. The endpoints are NOT implied
+  /// here (they are always emphasized separately); this is the user's extra
+  /// via-points, persisted on `RoutePlan` so a restored route still shows them as
+  /// big markers. Empty for a default/migrated full-spine route (AC-3).
+  final List<String> markedStopIds;
 
   /// The travel-order node ids (start → end) — the authoritative authored route
   /// persisted by `RoutePlan` (ADR-0005 decision 4).
@@ -218,6 +226,14 @@ abstract final class RoutePlanner {
       subGeography: subGeography,
       orderedNodes: List<Province>.unmodifiable(orderedNodes),
       canonicalOriginKm: canonicalOriginKm,
+      // Record the user's marked stops (route-real-road / AC-4) so they persist
+      // on the RoutePlan and re-emphasize on restore. Filtered to the nodes that
+      // actually survive in the resolved sub-path (all do by construction — a
+      // marked stop is protected — but this stays robust if that ever changes).
+      markedStopIds: List<String>.unmodifiable(<String>[
+        for (final id in markedIds)
+          if (survivingNodes.any((n) => n.id == id)) id,
+      ]),
     );
   }
 
@@ -235,6 +251,7 @@ abstract final class RoutePlanner {
     required ProvinceChain fullChain,
     required ProvinceGeography fullGeography,
     required List<String> orderedNodeIds,
+    List<String> markedStopIds = const <String>[],
   }) {
     if (orderedNodeIds.length < 2) {
       throw ArgumentError.value(
@@ -308,11 +325,18 @@ abstract final class RoutePlanner {
       fullChain,
       fullChain.indexOf(canonicalNodes.first),
     );
+    // Keep only the marked-stop ids that are actually part of this sub-path
+    // (defensive against a stale persisted id — a dropped id simply de-emphasizes).
+    final orderedIdSet = <String>{for (final n in orderedNodes) n.id};
     return ResolvedRoute(
       subChain: subChain,
       subGeography: subGeography,
       orderedNodes: List<Province>.unmodifiable(orderedNodes),
       canonicalOriginKm: canonicalOriginKm,
+      markedStopIds: List<String>.unmodifiable(<String>[
+        for (final id in markedStopIds)
+          if (orderedIdSet.contains(id)) id,
+      ]),
     );
   }
 

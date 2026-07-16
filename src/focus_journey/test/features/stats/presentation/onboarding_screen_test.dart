@@ -19,6 +19,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:focus_journey/features/route/presentation/map_view.dart'
+    show kBaseMapAttribution;
 import 'package:focus_journey/features/stats/presentation/onboarding_screen.dart';
 
 /// Sizes the test surface tall enough that the whole scrollable privacy content
@@ -106,6 +108,25 @@ void main() {
       );
       // The active-vs-journey copy states raw is never larger than journey.
       expect(find.text('Active time vs journey time'), findsOneWidget);
+    });
+  });
+
+  group('AC-9 onboarding shows the CC BY-SA base-map attribution (S-2)', () {
+    // The full-screen map credit pill is covered by map_view's tests; this pins
+    // the SECOND half of AC-9 — the share-alike credit is also reachable from
+    // the first-run onboarding screen (a journey-tab user may never open the
+    // full-screen map). Single-sourced from `kBaseMapAttribution`.
+    testWidgets('the CC BY-SA credit is rendered on the onboarding screen', (
+      tester,
+    ) async {
+      _useTallSurface(tester);
+      await tester.pumpWidget(
+        MaterialApp(home: OnboardingScreen(onComplete: () {})),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('CC BY-SA'), findsWidgets);
+      expect(find.text(kBaseMapAttribution), findsOneWidget);
     });
   });
 }

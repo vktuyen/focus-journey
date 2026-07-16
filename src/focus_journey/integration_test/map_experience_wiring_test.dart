@@ -18,8 +18,10 @@
 //     and the snapshot inputs are unchanged; the map cubit constructs no engine /
 //     ticker (it holds none by construction).
 //
-// No real engine, no real timers, no real network. The fake tile provider is
-// injected into every surface.
+// No real engine, no real timers, no real network. ADR-0008(c) DROPPED the OSM
+// `TileLayer`, so the map is offline by construction: the base is a bundled
+// [BaseMapGeometry] ([_baseMap]) drawn as a PolygonLayer — there is no tile
+// provider to fake and no request that could reach the network.
 //
 // Runs under `flutter test` (headless) and on a desktop device:
 //   fvm flutter test integration_test/map_experience_wiring_test.dart
@@ -27,11 +29,13 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:focus_journey/features/journey/domain/activity_segment.dart';
 import 'package:focus_journey/features/journey/domain/journey_progress.dart';
 import 'package:focus_journey/features/journey/domain/journey_state.dart';
 import 'package:focus_journey/features/journey/domain/travel_mode.dart';
+import 'package:focus_journey/features/route/domain/base_map_geometry.dart';
 import 'package:focus_journey/features/route/domain/journey_direction.dart';
 import 'package:focus_journey/features/route/domain/province.dart';
 import 'package:focus_journey/features/route/domain/province_chain.dart';
@@ -39,11 +43,11 @@ import 'package:focus_journey/features/route/domain/province_geography.dart';
 import 'package:focus_journey/features/route/domain/route_plan.dart';
 import 'package:focus_journey/features/route/domain/route_repository.dart';
 import 'package:focus_journey/features/route/domain/route_selection.dart';
+import 'package:focus_journey/features/route/presentation/base_map_layer.dart';
 import 'package:focus_journey/features/route/presentation/map_cubit.dart';
 import 'package:focus_journey/features/route/presentation/map_surface.dart';
 import 'package:focus_journey/features/route/presentation/map_view.dart';
 import 'package:focus_journey/features/route/presentation/route_progress_cubit.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:integration_test/integration_test.dart';
 
 const double _tol = 1e-6;
@@ -71,6 +75,37 @@ ProvinceGeography _fixtureGeography(ProvinceChain chain) => ProvinceGeography(
     'ha_giang': GeoCoordinate(latitude: 22.82, longitude: 104.98),
   },
 );
+
+/// The bundled offline base geometry (ADR-0008): a land ring enclosing the
+/// fixture chain + a couple of province-outline rings. No asset, no network.
+BaseMapGeometry _baseMap() => BaseMapGeometry(
+  landRings: const <List<GeoCoordinate>>[
+    <GeoCoordinate>[
+      GeoCoordinate(latitude: 8.0, longitude: 103.0),
+      GeoCoordinate(latitude: 8.0, longitude: 109.8),
+      GeoCoordinate(latitude: 23.5, longitude: 109.8),
+      GeoCoordinate(latitude: 23.5, longitude: 103.0),
+      GeoCoordinate(latitude: 8.0, longitude: 103.0),
+    ],
+  ],
+  provinceRings: const <List<GeoCoordinate>>[
+    <GeoCoordinate>[
+      GeoCoordinate(latitude: 15.0, longitude: 107.0),
+      GeoCoordinate(latitude: 15.0, longitude: 109.0),
+      GeoCoordinate(latitude: 17.0, longitude: 109.0),
+      GeoCoordinate(latitude: 17.0, longitude: 107.0),
+      GeoCoordinate(latitude: 15.0, longitude: 107.0),
+    ],
+  ],
+);
+
+/// Whether the bundled base PolygonLayer (land fill) is in the tree.
+bool _baseMapPresent(WidgetTester tester) {
+  final layers = tester.widgetList<PolygonLayer<Object>>(
+    find.byType(PolygonLayer<Object>),
+  );
+  return layers.any((l) => l.polygons.any((p) => p.color == kLandFill));
+}
 
 Province _node(ProvinceChain chain, String id) =>
     chain.nodes.firstWhere((p) => p.id == id);
@@ -128,7 +163,7 @@ class _RecordingRouteRepo implements RouteRepository {
   }
 
   @override
-  Future<RoutePlan?> loadPlan() async => _storedPlan;
+  Future<RoutePlan?> loadPlan({double currentCumulativeKm = 0}) async => _storedPlan;
 
   @override
   Future<void> savePlan(RoutePlan plan) async {
@@ -235,8 +270,6 @@ void main() {
         map.updateFromRoute(route.state);
         map.updateFromSnapshot(_progress(const <ActivitySegment>[], 200));
 
-        final provider = FakeTileProvider();
-
         await tester.pumpWidget(
           MaterialApp(
             home: MultiBlocProvider(
@@ -248,13 +281,17 @@ void main() {
                 body: InlineMapOverlay(
                   chain: chain,
                   geography: geography,
-                  tileProvider: provider,
+                  baseMap: _baseMap(),
                 ),
               ),
             ),
           ),
         );
         await tester.pump();
+
+        // The inline minimap renders the bundled offline base (no tiles).
+        expect(_baseMapPresent(tester), isTrue);
+        expect(find.byType(TileLayer), findsNothing);
 
         expect(find.byType(FullScreenMap), findsNothing);
         // Tap the floating minimap card (the InkWell is the single tap target).
@@ -271,6 +308,10 @@ void main() {
         // single-window guarantee for AC-2; popping it returns to the inline
         // overlay (see the widget-layer TC-223 dismiss cases).
         expect(find.byType(FullScreenMap), findsOneWidget);
+        // The full-screen surface also renders the base offline (AC-1) with no
+        // OSM tile layer (AC-10 regression guard for the dropped tile base).
+        expect(_baseMapPresent(tester), isTrue);
+        expect(find.byType(TileLayer), findsNothing);
         // Popping the pushed route restores the inline overlay on the SAME
         // stack — confirming it was a same-window route, not a separate window.
         final navigator = tester.state<NavigatorState>(find.byType(Navigator));
@@ -354,7 +395,6 @@ void main() {
         map.updateFromRoute(route.state);
         final snapshot = _progress(<ActivitySegment>[_idle(100, 200)], 300);
         map.updateFromSnapshot(snapshot);
-        final provider = FakeTileProvider();
 
         // Mount the overlay, then unmount it (toggle off), then remount it.
         Widget host(bool show) => MaterialApp(
@@ -368,7 +408,7 @@ void main() {
                   ? InlineMapOverlay(
                       chain: chain,
                       geography: geography,
-                      tileProvider: provider,
+                      baseMap: _baseMap(),
                     )
                   : const SizedBox.shrink(),
             ),
@@ -395,13 +435,4 @@ void main() {
       },
     );
   });
-}
-
-/// A fake tile provider — NEVER touches the network (the integration leg still
-/// must not make a real OSM request).
-class FakeTileProvider extends TileProvider {
-  @override
-  ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
-    return MemoryImage(TileProvider.transparentImage);
-  }
 }

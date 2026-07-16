@@ -82,7 +82,8 @@ class RecordingRouteRepository implements RouteRepository {
   }
 
   @override
-  Future<RoutePlan?> loadPlan() async => _storedPlan;
+  Future<RoutePlan?> loadPlan({double currentCumulativeKm = 0}) async =>
+      _storedPlan;
 
   @override
   Future<void> savePlan(RoutePlan plan) async {

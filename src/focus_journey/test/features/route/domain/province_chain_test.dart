@@ -5,12 +5,14 @@
 //
 // Pure-data tests: no Flutter, no I/O, no timers. Asserts run against BOTH the
 // explicit fixture chain (the AC worked example, total 1440) and the production
-// vietnamProvinceChain constant (total exactly 2000).
+// vietnamProvinceChain constant (province-chain-2026: 34 current units, 33
+// great-circle segments, derived great-circle total ~2500..3500 km).
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:focus_journey/features/route/domain/journey_direction.dart';
 import 'package:focus_journey/features/route/domain/province.dart';
 import 'package:focus_journey/features/route/domain/province_chain.dart';
+import 'package:focus_journey/features/route/domain/vietnam_units_2026.dart';
 
 const double kTol = 1e-6;
 
@@ -102,13 +104,25 @@ void main() {
   group('ProvinceChain — production constant integrity (TC-NF4)', () {
     final chain = vietnamProvinceChain;
 
-    test('hasAround10To15Checkpoints', () {
-      expect(chain.nodes.length, inInclusiveRange(10, 15));
+    test('hasExactly34Checkpoints', () {
+      // province-chain-2026 AC-1: one node per current 2026 unit.
+      expect(chain.nodes.length, 34);
     });
 
-    test('isStrictlyOrdered_muiCaMauToHaGiang', () {
-      expect(chain.southTip.id, 'mui_ca_mau');
-      expect(chain.northTip.id, 'ha_giang');
+    test('endpointsAreTheLatitudeExtremes_caMauToMaxLatitudeUnit', () {
+      // AC-2/PC-903: south tip = the southernmost centre (Cà Mau / Tân Thành,
+      // lat ≈ 9.177); north tip = the northernmost current unit (max-latitude
+      // admin centre). The old `ha_giang` north-terminus identity is retired
+      // (Hà Giang is now within Tuyên Quang) — assert against the latitude
+      // extreme, not a hardcoded id, then confirm which unit that resolves to.
+      final byLat = <VietnamUnit>[...kVietnamUnits2026]
+        ..sort((a, b) => a.lat.compareTo(b.lat));
+      expect(chain.southTip.id, kVietnamUnits2026.first.id);
+      expect(chain.southTip.id, byLat.first.id); // southernmost centre
+      expect(chain.southTip.id, 'ca_mau');
+      expect(chain.northTip.id, kVietnamUnits2026.last.id);
+      expect(chain.northTip.id, byLat.last.id); // max-latitude centre
+      expect(chain.northTip.id, 'cao_bang');
     });
 
     test('hasNoDuplicateIds', () {
@@ -122,15 +136,18 @@ void main() {
       }
     });
 
-    test('segmentSumEqualsTotalChainKm_exactly2000', () {
+    test('segmentSumEqualsTotalChainKm_derivedGreatCircleTotal', () {
       final sum = chain.segmentsKm.fold<double>(0, (a, b) => a + b);
       expect(chain.totalChainKm, closeTo(sum, kTol));
-      // Locked decision 2: total is exactly 2000 (÷ ~8h = 250 km/active-hour).
-      expect(chain.totalChainKm, closeTo(2000, kTol));
+      // AC-3: the total is the sum of the 33 great-circle segments — not a
+      // hardcoded literal. Assert only a sane range (~2500..3500 km per spec).
+      expect(chain.totalChainKm, greaterThan(2500));
+      expect(chain.totalChainKm, lessThan(3500));
     });
 
-    test('segmentCountIsNodesMinusOne', () {
+    test('segmentCountIsNodesMinusOne_thirtyThree', () {
       expect(chain.segmentsKm.length, chain.nodes.length - 1);
+      expect(chain.segmentsKm.length, 33);
     });
   });
 

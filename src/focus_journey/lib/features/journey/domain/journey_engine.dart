@@ -143,10 +143,14 @@ class JourneyEngine {
     _currentDay = _dateOf(_clock.now());
   }
 
-  /// Default virtual rate (km per active hour). Sized so the ~2,000 km Vietnam
-  /// chain is crossed in ~8 active hours (plan §11). The authoritative number is
-  /// owned by `route-progress`; this is only a sensible standalone default and is
-  /// expected to be overridden via the constructor when the two slices are wired.
+  /// **Test-only fallback** virtual rate (km per active hour). This is NOT the
+  /// shipped pacing: production injects `kmPerActiveHour` via the constructor as
+  /// `vietnamProvinceChain.totalChainKm / 8` (province-chain-2026 / AC-4 — the
+  /// 34-unit great-circle total ÷ ~8 active hours, ≈395 km/h, not this literal).
+  /// The value 250 is retained only as a sensible standalone default for tests
+  /// that construct the engine without wiring the chain; it corresponds to the
+  /// retired stylized 2000 km ÷ 8 premise and must never be relied on as the
+  /// production rate.
   static const double defaultKmPerActiveHour = 250;
 
   /// `maxTickDelta` defaults to this multiple of `T` when not supplied.

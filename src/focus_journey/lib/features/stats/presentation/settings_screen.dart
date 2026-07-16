@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../journey/domain/travel_mode.dart';
+import '../../reset/presentation/factory_reset_dialog.dart';
 import '../domain/app_settings.dart';
 import 'onboarding_screen.dart';
 import 'settings_cubit.dart';
@@ -130,6 +131,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
+              const Divider(),
+              // journey-reset (AC-1/AC-3): the destructive Factory reset. Its
+              // FactoryResetCubit is provided by the composition root above the
+              // reconstructable graph, so the tile just reads + drives it.
+              const _SectionHeader('Data'),
+              const FactoryResetTile(),
             ],
           );
         },

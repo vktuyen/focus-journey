@@ -7,11 +7,13 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../reset/domain/local_data_store.dart';
 import '../domain/app_settings.dart';
 import '../domain/stats_repositories.dart';
 
 /// A [SettingsRepository] backed by `shared_preferences` + JSON.
-class SharedPreferencesSettingsRepository implements SettingsRepository {
+class SharedPreferencesSettingsRepository
+    implements SettingsRepository, LocalDataStore {
   /// Creates the repository over an existing [SharedPreferences] instance.
   SharedPreferencesSettingsRepository(this._prefs);
 
@@ -45,5 +47,15 @@ class SharedPreferencesSettingsRepository implements SettingsRepository {
   @override
   Future<void> save(AppSettings settings) async {
     await _prefs.setString(storageKey, jsonEncode(settings.toJson()));
+  }
+
+  // --- LocalDataStore (journey-reset AC-3) ---
+
+  @override
+  Set<String> get ownedKeys => const <String>{storageKey};
+
+  @override
+  Future<void> clear() async {
+    await _prefs.remove(storageKey);
   }
 }

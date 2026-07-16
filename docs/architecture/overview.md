@@ -4,7 +4,7 @@ One-page picture of the system. Update when the shape of things changes; don't l
 
 ## Components
 
-> All decisions trace to `planning/backlog/vietnam_focus_journey_plan.md` §0 (locked v1).
+> Domain terms & invariants: [../domain/glossary.md](../domain/glossary.md), [../domain/business-rules.md](../domain/business-rules.md). Original epic framing: [planning/backlog/vietnam-focus-journey.md](../../planning/backlog/vietnam-focus-journey.md).
 
 - **`JourneyEngine`** (pure Dart, *domain*) — the core loop. `tick(delta)` converts active time into distance using the speed-only model; it tracks `activeTimeToday` (journey time, including the 5-minute idle grace), `rawActiveTime` (true input time, no grace), `idleTimeToday`, `distanceKm`, `state`, and `mode`. It takes an **injected clock + injected `ActivityPlugin`** — no real timers or `DateTime.now()` inside — so it is deterministic and unit-testable. Stats/streaks are computed from `rawActiveTime`; distance is computed from journey time.
 - **`ActivityPlugin`** (*domain* interface + platform-channel implementations) — `getSystemIdleSeconds()`, `isScreenLocked()`. macOS (Swift) + Windows (C++/Win32) implementations, plus a **mock source** (`--mock-activity`) for dev/UI testing. (Spike first: check pub.dev for an existing idle package before writing custom native code.)
@@ -16,7 +16,7 @@ One-page picture of the system. Update when the shape of things changes; don't l
 - **Persistence** (*data*) — `shared_preferences`/JSON repository (the data is tiny).
 - **Layering** — presentation / domain / data (Clean Architecture), SOLID, dependency injection.
 - **Mini-window + tray/menu-bar (v2)** — a user-invoked compact Picture-in-Picture mode, **single-window two-mode** (full ⇄ compact PiP, mutually exclusive — never co-visible) driven by `window_manager`, plus an always-present tray/menu-bar icon (hide-to-tray) via `tray_manager`. One `FlutterEngine`, one `JourneyEngine`/Bloc/ticker/Flame scene shared across both modes — see **ADR-0003**.
-- **Deferred to v2 / later** — `drift`/SQLite, `rive`, leaderboard backend, AI coach. (`flutter_map` + OSM tiles are now **active** in v2 via `map-experience` — see ADR-0004.)
+- **Deferred to v2 / later** — `drift`/SQLite, `rive`. (`flutter_map` + OSM tiles are now **active** in v2 via `map-experience` — see ADR-0004.)
 
 ## Data flow
 
@@ -43,7 +43,7 @@ Persistence (shared_preferences / JSON)
 - **No backend / cloud / auth.** v1 was fully local/offline. **v2 (ADR-0004) adds the product's only network egress: anonymous OSM map-tile fetches** — the tile URL carries `{z}/{x}/{y}` + a static user-agent, **no user data, no tracking** — with graceful offline fallback. The data-privacy promise is unchanged: only aggregate idle *duration* mapped to route *distance* and static province reference lat/long are used; **no** keystrokes, screen, clipboard, files, GPS, or device location.
 - **OS APIs** (system idle time, screen lock, sleep/wake) accessed via Flutter platform channels. Failure mode: API unavailable or permission denied → treat as idle and surface an error; the mock source covers dev.
 - **Flutter packages** (build-time dependencies, not services): `flame`, `flutter_bloc`, `shared_preferences`. `window_manager` + `tray_manager` drive the v2 mini-window (single-window full ⇄ compact PiP + tray, per ADR-0003); compact-window position is persisted via `shared_preferences` and clamped onto a visible display via `screen_retriever`. **`flutter_map` (^8.3.0) + `latlong2` (^0.9.1)** render the v2 real-geography map over OSM tiles (offline-first fallback + visible OSM attribution; the only egress is anonymous tile GETs — see ADR-0004). `launch_at_startup` / `local_notifier` are v1-optional.
-- **Deferred to v2:** leaderboard backend, `drift`, `rive`.
+- **Deferred to v2:** `drift`, `rive`.
 
 ## Environments
 
@@ -76,8 +76,9 @@ The chassis phase commands (`/implement`, `/review-code`, …) delegate by **rol
 | 3 Build | Test automation (`test-script-author`) | `test-script-author` | — |
 | 4 Review | Reviewer (`code-reviewer`) | `flutter-code-reviewer` | `/privacy-audit` (runs `privacy-guardian`) |
 
-> Stack: **Flutter desktop** (macOS + Windows), state via **Bloc**. Full rationale + locked v1/v2/v3 scope: `planning/backlog/vietnam_focus_journey_plan.md` §0. The **Automation testing** section above still needs the Flutter runner filled in by `/init-architecture` (likely `flutter test` for unit, `integration_test` for e2e) before `/execute-tests` can run.
+> Stack: **Flutter desktop** (macOS + Windows), state via **Bloc**. Original epic framing + v1/v2/v3 scope: [planning/backlog/vietnam-focus-journey.md](../../planning/backlog/vietnam-focus-journey.md). Test runner is settled (see **Automation testing** above): `flutter test` for unit/widget, `integration_test` for e2e.
 
 ## See also
-- Decisions: [decisions/](decisions/) — incl. **ADR-0004** (OSM map tiles / first network egress + canonical-km distance→polyline projection), **ADR-0005** (custom routes via derived sub-chains + stop-and-restart lifecycle; supersedes `route-progress`'s fixed-chain + start/direction selection and terminal-only completion), and **ADR-0006** (arc-length-aware side-object spawn cadence for the F1-style dynamic curve — preserves AC-7 even-spacing at the sharper curvature, O(1)/alloc-free)
-- Diagrams: [diagrams/](diagrams/)
+- Decisions: [decisions/](decisions/) — incl. **ADR-0004** (OSM map tiles / first network egress + canonical-km distance→polyline projection; **its tile-egress part is amended by ADR-0008** — the canonical-km projection ADR-0004(b) still stands), **ADR-0005** (custom routes via derived sub-chains + stop-and-restart lifecycle; supersedes `route-progress`'s fixed-chain + start/direction selection and terminal-only completion), **ADR-0006** (arc-length-aware side-object spawn cadence for the F1-style dynamic curve — preserves AC-7 even-spacing at the sharper curvature, O(1)/alloc-free), and **ADR-0008** (Vietnam base map: bundled georeferenced GeoJSON `PolygonLayer` reprojected offline from the CC BY-SA equirectangular SVG, single-tone "location-map" look; **drops the OSM `TileLayer` → network egress goes to zero**, amending ADR-0004(a); attribution shifts to an in-app CC BY-SA 3.0 credit), and **ADR-0009** (journey data model rebuilt onto Vietnam's current **34 units**: great-circle (haversine) auto-distances over administrative-centre coordinates — **amends ADR-0004(b)**'s stylized-~2000 km source, axis preserved, `kmPerActiveHour` re-derived so a traversal still takes ≈8 active hours; one **hand-curated coast-hugging spine** proven on-land by an automated no-sea-crossing test against ADR-0008's geometry; persisted plans **migrate by reset** onto the new spine — **amends ADR-0005's migration clause**; direction/tip enums kept as stable symbolic labels)
+- Diagrams: [diagrams/system-overview.md](diagrams/system-overview.md) — component + data-flow (Mermaid)
+- Domain: [../domain/glossary.md](../domain/glossary.md) · [../domain/business-rules.md](../domain/business-rules.md) · [../domain/personas.md](../domain/personas.md)

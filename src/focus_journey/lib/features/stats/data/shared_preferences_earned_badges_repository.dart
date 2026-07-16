@@ -7,12 +7,13 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../reset/domain/local_data_store.dart';
 import '../domain/earned_badges.dart';
 import '../domain/stats_repositories.dart';
 
 /// An [EarnedBadgesRepository] backed by `shared_preferences` + JSON.
 class SharedPreferencesEarnedBadgesRepository
-    implements EarnedBadgesRepository {
+    implements EarnedBadgesRepository, LocalDataStore {
   /// Creates the repository over an existing [SharedPreferences] instance.
   SharedPreferencesEarnedBadgesRepository(this._prefs);
 
@@ -44,5 +45,15 @@ class SharedPreferencesEarnedBadgesRepository
   @override
   Future<void> save(EarnedBadges earned) async {
     await _prefs.setString(storageKey, jsonEncode(earned.toJson()));
+  }
+
+  // --- LocalDataStore (journey-reset AC-3) ---
+
+  @override
+  Set<String> get ownedKeys => const <String>{storageKey};
+
+  @override
+  Future<void> clear() async {
+    await _prefs.remove(storageKey);
   }
 }

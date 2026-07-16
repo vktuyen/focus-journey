@@ -9,6 +9,145 @@ Every file the journey scene is allowed to load is declared in
 The scene degrades gracefully (renders a placeholder) for any manifest path that is
 not yet shipped.
 
+## Vietnam base map — 34 provincial units, 2025 reform (CURRENT)
+
+> **CURRENT administrative structure.** On **1 July 2025** Vietnam's National
+> Assembly merged the former 63 provinces into **34 provincial-level units**
+> (**28 provinces + 6 centrally-governed cities**). This section supersedes the
+> pre-2025 63-province files below (kept as historical).
+
+Offline, geographically-accurate map of Vietnam showing the **34 current
+provincial-level units** with the **merged 2025 boundaries** (accurate S-shape
+coastline + the new internal borders; the old 63-province internal borders are
+gone — e.g. Gia Lai, Đắk Lắk and Lâm Đồng render as single merged mega-regions).
+Vector SVG with **individual province paths**. This is a **CC BY-SA 3.0** file,
+so **attribution IS required** (unlike the CC0 scenery) — recorded per-row below.
+License text: https://creativecommons.org/licenses/by-sa/3.0/
+
+| File (under assets/map/) | Source URL | Author | Licence | Attribution / notes |
+| --- | --- | --- | --- | --- |
+| vietnam_provinces_2025.svg | https://commons.wikimedia.org/wiki/File:Vietnam,_administrative_divisions_-_et_-_colored_2025.svg | TUBS; PIkne (translation) — Wikimedia Commons | CC BY-SA 3.0 | **Original, unmodified upload — source of record.** Attribution string: *"Vietnam administrative divisions 2025 by TUBS / PIkne, CC BY-SA 3.0, via Wikimedia Commons"*. Choropleth (one pastel fill per unit — helpful for per-province selection). Visible labels are baked as glyph paths: **Vietnamese province names** (correct + useful) plus **Estonian** neighbour-country names (HIINA/LAOS/TAI/KAMBODŽA) and sea names. Also contains a hidden (`display:none`) German tooltip text layer. |
+| vietnam_provinces_2025_base.svg | (derived from the file above) | TUBS; PIkne (translation) | CC BY-SA 3.0 (derivative → **share-alike applies**) | **Source SVG for the bundled GeoJSON below.** Only the hidden German tooltip layer (`<g id="TT" display:none>`, all `<text>`) was removed as dead invisible metadata (−38 KB). **No geometry altered** — coastline + all 34 province polygons + sea/neighbours are the originals; renders identically to the source. Same attribution string as above. |
+| vietnam_provinces_2025.geojson | (derived from `vietnam_provinces_2025_base.svg`) | TUBS; PIkne (translation) | CC BY-SA 3.0 (derivative → **share-alike applies**) | **SHIPPED base layer (vietnam-map-fidelity / ADR-0008).** Georeferenced lat/long GeoJSON produced OFFLINE by `tool/svg_to_geojson.py` (inverse of the equirectangular projection below). `role:land` = the national landmass (single calm fill + point-in-landmass); `role:province` = the 34 provincial-unit outlines (thin borders — a few units are multipart, so ~37 rings). Province AREAS were isolated by their pastel choropleth fills; the `#646464` label glyphs + boundary strokes were dropped (the app draws its own borders), so the baked-label caveat below did NOT require the SVG-clean fallback. The in-app CC BY-SA 3.0 credit (map attribution pill + onboarding) satisfies the mandatory share-alike attribution. Same attribution string as above. |
+
+**Baked-label caveat (honest quality note).** Unlike the pre-2025 base (which was
+cleanly label-free), the visible labels here are **glyph-outline paths intermingled
+with the province polygons and boundary paths inside one group (`g164`), sharing
+the boundary fill `#646464`** — so they cannot be stripped programmatically
+without destroying boundary geometry (verified: a colour-based strip also removed
+borders and still left some labels). If a **blank** base is wanted, delete the
+label group manually in Inkscape (a human can select it visually in seconds), or
+render the app's own labels from the DELIVERABLE-2 dataset via the georeferencing
+below. The Vietnamese **province** labels are arguably a plus and can be kept.
+
+**Province paths:** the 34 units as **individual paths grouped under `id="Vietnam"`
+/ `g164`**, but with **generic ids** (`path8`, `pathNNN`) and **no
+`inkscape:label`** — so per-province theming/hit-testing needs a manual id→name
+(or fill-colour→name) pass, same limitation as the pre-2025 file. Sea =
+`id="Sea"`, neighbours = `id="other_countries"`. Paracel/Spratly island groups
+present as small polygons.
+
+**Georeferencing (CRITICAL for overlays).** The file is a **TUBS location-map-scheme**
+SVG on the **same 1200 × 2349 canvas** as the pre-2025 base. Verified by rendering
+both at 1200 px wide and comparing sea masks: **IoU = 0.96** — the coastlines
+coincide, so this file inherits the pre-2025 base's already-verified frame.
+
+- **Projection:** Equirectangular / plate carrée (stretched ~104% vertically —
+  baked into the bounds; the linear edge formula below is exact on the rendered image).
+- **viewBox:** `0.344 0.001 1200.001 2349.175` · nominal size 1200 × 2349.18 px.
+  (Origin differs from the old base's `-6.994 1155.062 …`, but rendering the
+  viewBox to a 1200-wide image normalises this — rendered-pixel positions match
+  the old base 1:1.)
+- **Edge bounds:** North (top) = **24.0°N**, South (bottom) = **8.0°N**,
+  West (left) = **101.8°E**, East (right) = **110.3°E**.
+- **Lon/lat → pixel** (in a 1200 × 2349.18 rendered image, top-left origin):
+  `x = (lon − 101.8) / (110.3 − 101.8) × 1200`,
+  `y = (24.0 − lat) / (24.0 − 8.0) × 2349.18`.
+- Recommend a quick overlay re-check (drop 2–3 known city dots) during `/implement`
+  before wiring precise per-province hit-testing.
+
+## Vietnam national highway route (route-real-road) — OpenStreetMap, ODbL
+
+Offline, static polyline of Vietnam's **real national highway**, so the journey
+route follows the actual curving road (not straight chords between cities). Sourced
+**at dev/build time from OpenStreetMap** via the Overpass API; the app ships only the
+static GeoJSON and makes **NO runtime network call** (preserves the zero-egress
+privacy promise — ADR-0008 posture). This is **ODbL** data, so **attribution IS
+required** (recorded per-row below); ODbL text: https://opendatacommons.org/licenses/odbl/1-0/
+
+| File (under assets/map/) | Source | Author | Licence | Attribution / notes |
+| --- | --- | --- | --- | --- |
+| vietnam_national_route.geojson | OpenStreetMap via Overpass API — route relations **15683339** (Quốc lộ 1 / QL1) and **18208508** (Quốc lộ 4A); exported **2026-07-16** from mirror `overpass.kumi.systems`. Query: `relation(<id>);out geom;` | © OpenStreetMap contributors | **ODbL 1.0** | **SHIPPED route layer.** Attribution string: *"Road data © OpenStreetMap contributors, ODbL"* (must appear in the in-app map credit alongside the base-map credit). FeatureCollection of two `LineString`s in raw WGS84 `[lon, lat]` (same unprojected frame + `bounds` N24/S8/W101.8/E110.3 as `vietnam_provinces_2025.geojson`; NOT pre-projected to pixels). **Feature 1 `QL1A`** = National Route 1, Đất Mũi (Cà Mau, ~8.76N) → Hữu Nghị (Lạng Sơn, ~21.97N), the coast-hugging S-curve. **Feature 2 `QL4A`** = Lạng Sơn → Cao Bằng connector, ends at its closest mapped approach to Cao Bằng city (~19 km NE at 106.32/22.83 — the OSM QL4A relation does not enter the city centre). |
+
+**Processing (offline, reproducible).** Built by `tool/build_national_route.py` from the
+raw Overpass `out geom;` exports. Member ways were stitched and ordered along a
+**piecewise-monotone parameter** — `lat+lon` (SW→NE diagonal) south of 12.3°N, latitude
+(S→N) north of it — taking the **median of each bin** to average the divided-carriageway
+dual ways and reject spur/outlier ways; the QL4A connector was ordered by greedy
+nearest-neighbour and trimmed at closest approach to Cao Bằng. Then **Douglas–Peucker**
+decimation (ε ≈ 0.006° ≈ 0.6 km).
+
+- **Vertex counts:** QL1: **74,632** raw OSM coords → 2,169 profile → **346** decimated.
+  QL4A: **13,614** raw → chained → **54** decimated. **Total shipped: 400 vertices**
+  (~9.5 KB), all inside the map bounds.
+- **Fidelity check:** the decimated QL1A passes within **≤7.6 km** of 15 known cities
+  spanning the whole route (Cà Mau, Cần Thơ, HCMC 2.9 km, Nha Trang, Đà Nẵng, Huế,
+  Vinh, Hà Nội, Lạng Sơn, …). Densely resampled, **99.5 %** of QL1A / **97.8 %** of QL4A
+  points fall on the bundled landmass; the ~0.5–2 % marginal misses are right at the
+  coastline where the *simplified base-map outline* sits slightly inland of the real
+  road (base-map simplification, not a sea excursion of the road).
+- **Coverage / gaps:** reaches Cà Mau (south terminus) and the Lạng Sơn/Hữu Nghị north
+  end; the connector gets the route into Cao Bằng province but stops **~19 km NE of Cao
+  Bằng city** (the mapped QL4A alignment does not enter the centre) — the route-integration
+  step handles the final north end.
+
+## Vietnam base map — provinces (vietnam-map-fidelity) — SUPERSEDED / HISTORICAL (pre-2025 63 provinces)
+
+> **SUPERSEDED by the 34-unit 2025 map above.** These files show the **pre-2025
+> 63-province** structure and are retained only for history / reference. Do not
+> use for the current bundled base map.
+
+Offline, geographically-accurate base map of Vietnam with **all pre-2025
+province (admin level 1) boundaries** as individual filled polygons — cream/ivory
+land (`#fdfcea`), grey neighbours (`#e0e0e0`), light-blue sea (`#c8ebff`) — the
+target "location map" look. **NOT CC0** like the Kenney scenery: it is released
+into the **public domain** by its author, so no attribution is legally required,
+but source/author are recorded below as a courtesy and for provenance.
+
+| File (under assets/map/) | Source URL | Author | Licence | Attribution / notes |
+| --- | --- | --- | --- | --- |
+| vietnam_provinces.svg | https://commons.wikimedia.org/wiki/File:Provinces_of_vietnam-blank_map.svg | Alexchris (Wikimedia Commons) | Public domain ("use for any purpose, without any conditions") | Original, unmodified upload. Retains the author's numbered annotations (1–10) on small provinces + a sea legend. Kept as the authoritative source of record. |
+| vietnam_provinces_base.svg | https://commons.wikimedia.org/wiki/File:Provinces_of_vietnam-blank_map.svg | Alexchris (Wikimedia Commons) | Public domain | **Shipped base layer.** Derived from the file above by removing the numeric label glyphs (`<g id="text*">` / legend `<text>`) so it composes as a clean base. **No geometry altered** — coastline + all province polygons + sea/neighbour fills are the originals. |
+
+**Georeferencing (CRITICAL for overlays).** The province geometry is drawn in the
+same coordinate frame as Uwe Dedering's *Vietnam location map.svg*
+(https://commons.wikimedia.org/wiki/File:Vietnam_location_map.svg, CC BY-SA 3.0 /
+GFDL) — identical 1200 × 2349.176 canvas and palette; prov content is wrapped in
+`transform="translate(-6.994,1155.062)"` which exactly cancels its offset
+viewBox, so rendered pixel positions match that base 1:1. Therefore the base's
+**documented equirectangular (plate carrée) edge bounds apply**:
+
+- **Projection:** Equirectangular / plate carrée (stretched 104% vertically —
+  baked into the bounds; the linear edge formula below is still exact).
+- **viewBox:** `-6.994 1155.062 1200 2349.176` · rendered size 1200 × 2349.176 px.
+- **Edge bounds (main map):** North (top) = **24.0°N**, South (bottom) = **8.0°N**,
+  West (left) = **101.8°E**, East (right) = **110.3°E**.
+- **Lon/lat → pixel** (in the rendered 1200 × 2349.176 image):
+  `x = (lon − 101.8) / (110.3 − 101.8) × 1200`,
+  `y = (24.0 − lat) / (24.0 − 8.0) × 2349.176`.
+  (In the SVG's own viewBox coordinates add the offset: `x += −6.994`, `y += 1155.062`.)
+- **Verified reference pixels** (rendered image, top-left origin): Hà Giang
+  22.82°N,104.98°E → (449,173) · Hà Nội 21.03,105.85 → (572,436) · Đà Nẵng
+  16.07,108.22 → (906,1164) · TP.HCM 10.78,106.70 → (692,1941) · Mũi Cà Mau
+  8.62,104.72 → (412,2258). All land on the correct city (overlay-checked).
+
+**Province paths:** ~63 pre-2025 provinces as **individual, separate polygons**
+(good for future per-province styling) but with **generic ids** (`polygon15`,
+`polygonNNN`) — **not named** and no `inkscape:label`, so per-province theming
+needs a manual id→name pass. Sea and neighbours are single paths (`id="Sea"`,
+`id="other_countries"`). The two Paracel/Spratly island groups are present as
+small polygons.
+
 ## Journey scene
 
 | File (under assets/journey/) | Source pack | Source URL | Author | Licence | Attribution / notes |

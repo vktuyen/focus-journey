@@ -1,65 +1,38 @@
-// Static-inspection separation / purity invariant for route-progress
-// (TC-016 / TC-017 static half, and the source-inspection half of TC-NF3).
+// Static-inspection separation / purity invariant for the route feature
+// (TC-016 / TC-017 static half, and the source-inspection privacy half —
+// TC-816 / TC-817 for the vietnam-map-fidelity base map).
 //
 // Reads every route-feature source file from disk and asserts NONE of them
 // contain — in CODE (doc comments stripped first) — any OS/activity surface, any
-// platform channel, any JourneyEngine import/coupling, or any write to engine
-// state. route-progress reads ONLY the cumulative `distanceKm` scalar (delivered
-// as a plain double) plus its own persisted selection.
+// platform channel, any JourneyEngine import/coupling, any write to engine
+// state, or (the privacy half) any network / map-tile-fetch API.
 //
-// The standalone custom-painted Map tab (`route_map_screen.dart`) was removed in
-// the map-experience slice; the start-picker + completion-celebration were
-// re-homed into `map_surface.dart` and the map is now drawn with `flutter_map`
-// over OpenStreetMap tiles (ADR-0004). So the OS/activity/engine-coupling
-// invariant below now also covers the map slice files (map_surface / map_view /
-// map_cubit / map_view_state / lat_lng_mapper), while the no-network / no-tile
-// (TC-NF3 source half) invariant applies ONLY to the non-map route files — the
-// map slice is the one blessed exception that fetches anonymous OSM tiles.
+// ADR-0008 UPDATE (why this test changed): the map slice USED to fetch anonymous
+// OSM tiles via `flutter_map`'s `TileLayer` (ADR-0004) — that was the one blessed
+// network exception. ADR-0008(c) DROPPED the OSM `TileLayer`: the base map is now
+// a BUNDLED, OFFLINE GeoJSON asset (`assets/map/vietnam_provinces_2025.geojson`)
+// rendered as a static `flutter_map` `PolygonLayer`, so the WHOLE route feature —
+// map slice included — now issues ZERO network egress. The no-network invariant
+// below therefore covers EVERY route file, with no exceptions. `flutter_map`
+// itself is allowed (it renders static polygons, not tiles) and
+// `flutter/services` is allowed (the `BaseMapRepository` reads the bundled asset
+// through `rootBundle`/`AssetBundle` — the same seam the app uses for its CC0
+// art) — what stays banned is any real network/tile-fetch client.
 //
 // Mirrors test/features/journey/presentation/journey_separation_static_test.dart.
 //
-// The MANUAL ship-blocker /privacy-audit (TC-018) and the device frame-timing
-// (TC-NF2) / network-disabled device run (TC-NF3 device half) are NOT automated
-// here — see the test-plan; they are deferred-to-manual.
+// The MANUAL ship-blocker /privacy-audit (TC-M-PRIV) and the network-disabled
+// device run are NOT automated here — see the test-plan; they are
+// deferred-to-manual.
 
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// Non-map route-feature source files (domain + presentation + data) that must
-/// stay FULLY OFFLINE — these never touch the network. Relative to the package
-/// root. The deleted `route_map_screen.dart` is gone; the map slice files live
-/// in [_mapSliceFiles] because they legitimately fetch OSM tiles.
-const List<String> _routeFiles = <String>[
-  'lib/features/route/domain/journey_direction.dart',
-  'lib/features/route/domain/province.dart',
-  'lib/features/route/domain/province_chain.dart',
-  'lib/features/route/domain/route_position.dart',
-  'lib/features/route/domain/route_repository.dart',
-  'lib/features/route/domain/route_selection.dart',
-  'lib/features/route/domain/route_progress_resolver.dart',
-  'lib/features/route/presentation/route_progress_cubit.dart',
-  'lib/features/route/presentation/route_view_state.dart',
-  'lib/features/route/presentation/route_map_painter.dart',
-  'lib/features/route/presentation/start_picker.dart',
-  'lib/features/route/data/shared_preferences_route_repository.dart',
-];
-
-/// The map-experience slice files (re-homed picker/celebration + the
-/// `flutter_map` surface). They MAY fetch anonymous OSM tiles (the one blessed
-/// network exception, ADR-0004), so they are exempt from the no-network /
-/// no-tile and no-flutter-services invariants — but they MUST still hold the
-/// OS/activity-surface, platform-channel, and JourneyEngine-coupling invariant.
-const List<String> _mapSliceFiles = <String>[
-  'lib/features/route/presentation/map_surface.dart',
-  'lib/features/route/presentation/map_view.dart',
-  'lib/features/route/presentation/map_cubit.dart',
-  'lib/features/route/presentation/map_view_state.dart',
-  'lib/features/route/presentation/lat_lng_mapper.dart',
-];
-
-/// All route source files the OS/activity/engine-coupling invariant covers.
-const List<String> _allRouteFiles = <String>[..._routeFiles, ..._mapSliceFiles];
+/// The base-map data repository — called out explicitly because it is the one
+/// route file that legitimately imports `flutter/services` (for `rootBundle`).
+/// The privacy guard proves that import is asset loading, never a network client.
+const String _baseMapRepository = 'lib/features/route/data/base_map_repository.dart';
 
 Directory _packageRoot() {
   Directory dir = Directory.current;
@@ -74,6 +47,21 @@ Directory _packageRoot() {
     }
     dir = parent;
   }
+}
+
+/// Every `.dart` source file under `lib/features/route`, relative to the package
+/// root. Globbed (not hand-listed) so a file added by a sibling slice is covered
+/// automatically — the separation/offline invariant must hold for the whole
+/// feature, not just the files that existed when this test was written.
+List<String> _allRouteFiles(Directory root) {
+  final dir = Directory('${root.path}/lib/features/route');
+  return dir
+      .listSync(recursive: true)
+      .whereType<File>()
+      .where((f) => f.path.endsWith('.dart'))
+      .map((f) => f.path.substring(root.path.length + 1))
+      .toList()
+    ..sort();
 }
 
 /// Strips `//`, `///`, and `/* */` comments so matches are against CODE only —
@@ -107,8 +95,12 @@ void main() {
     return map;
   }
 
-  // The non-map files that must stay fully offline (no network / tiles).
-  Map<String, String> codeByFile() => codeFor(_routeFiles);
+  final routeFiles = _allRouteFiles(root);
+
+  test('routeFileScanIsNonEmpty_soTheGuardIsMeaningful', () {
+    expect(routeFiles, isNotEmpty);
+    expect(routeFiles, contains(_baseMapRepository));
+  });
 
   group('TC-016 route source reads no OS/activity surface (code only)', () {
     const forbidden = <String>[
@@ -122,9 +114,9 @@ void main() {
     ];
 
     test('noForbiddenOsActivityTokenInAnyRouteCodeLine', () {
-      // Covers the map slice too: the re-homed picker/celebration + the
-      // flutter_map surface read NO OS/activity surface (AC-12 / separation).
-      final code = codeFor(_allRouteFiles);
+      // Covers the map slice too: the picker/celebration, the flutter_map surface
+      // and the bundled-base repository read NO OS/activity surface (separation).
+      final code = codeFor(routeFiles);
       final violations = <String>[];
       code.forEach((rel, src) {
         for (final token in forbidden) {
@@ -140,27 +132,10 @@ void main() {
       );
     });
 
-    test('noPlatformServicesImportAnywhereInRoute', () {
-      // The non-map route files need no flutter services (no asset bundle, no
-      // platform channel). Ban it outright. (The map slice legitimately imports
-      // flutter/services for the injectable TileProvider seam — see map_surface.)
-      final code = codeByFile();
-      code.forEach((rel, src) {
-        expect(
-          src.contains('package:flutter/services.dart'),
-          isFalse,
-          reason: '$rel must not import flutter services',
-        );
-      });
-    });
-
     test('noJourneyEngineCouplingAnywhereInRoute', () {
-      // route-progress consumes a plain `double` scalar — it imports neither the
-      // engine nor the activity feature. (AC-16 true-by-construction: the cubit
-      // holds no JourneyEngine reference.) Covers the map slice too: it consumes
-      // only derived journey value types (segment/progress snapshots), never the
-      // engine itself nor the activity feature.
-      final code = codeFor(_allRouteFiles);
+      // route consumes a plain `double` distance scalar / derived value types —
+      // it imports neither the engine nor the activity feature.
+      final code = codeFor(routeFiles);
       code.forEach((rel, src) {
         expect(
           src.contains('journey_engine'),
@@ -177,7 +152,6 @@ void main() {
   });
 
   group('TC-017 route mutates no engine state (static half)', () {
-    // Engine/journey-state field names route-progress must never WRITE.
     const engineStateFields = <String>[
       'activeTimeToday',
       'rawActiveTime',
@@ -185,7 +159,7 @@ void main() {
     ];
 
     test('noAssignmentToEngineStateFieldsInRouteFiles', () {
-      final code = codeFor(_allRouteFiles);
+      final code = codeFor(routeFiles);
       final violations = <String>[];
       code.forEach((rel, src) {
         for (final field in engineStateFields) {
@@ -209,10 +183,7 @@ void main() {
     });
 
     test('routeOwnedDistanceKmIsNeverAccrued', () {
-      // The slice may READ a `distanceKm` scalar and STORE it in immutable view
-      // fields (constructor initialisers / named params), but must never accrue
-      // it (`distanceKm += ...`, `distanceKm++`). Catch only mutating forms.
-      final code = codeFor(_allRouteFiles);
+      final code = codeFor(routeFiles);
       final violations = <String>[];
       code.forEach((rel, src) {
         final accrue = RegExp(
@@ -228,17 +199,20 @@ void main() {
     });
   });
 
-  group('TC-NF3 (source half) non-map route uses no network / tile provider', () {
-    // Any network or map-tile dependency would break the offline promise for the
-    // non-map route files. (The map slice is the one blessed exception — it
-    // fetches anonymous OSM tiles, ADR-0004 — so it is deliberately excluded
-    // here; its tile-request payload is audited in map_surface_test TC-231.)
+  group('TC-816/TC-817 route renders fully offline — no network/tile fetch', () {
+    // ADR-0008: the base map is a BUNDLED asset (no OSM tiles anymore), so the
+    // whole route feature must be network-free. `package:flutter_map` is NOT
+    // banned (it renders static polygons, not tiles) and `flutter/services` is
+    // NOT banned (asset loading via rootBundle). What is banned is any genuine
+    // network / tile-fetch client.
     const forbiddenNetwork = <String>[
       'dart:io', // sockets / HttpClient
       'package:http',
       'package:dio',
-      'package:flutter_map',
+      'TileLayer', // OSM tile fetch — dropped by ADR-0008(c)
       'TileProvider',
+      'urlTemplate', // OSM tile URL template
+      'openstreetmap',
       'NetworkImage',
       'HttpClient',
       'Socket(',
@@ -246,7 +220,7 @@ void main() {
     ];
 
     test('noNetworkOrTileTokenInAnyRouteCodeLine', () {
-      final code = codeByFile();
+      final code = codeFor(routeFiles);
       final violations = <String>[];
       code.forEach((rel, src) {
         for (final token in forbiddenNetwork) {
@@ -259,9 +233,51 @@ void main() {
         violations,
         isEmpty,
         reason:
-            'route must render fully offline (no network/tiles):\n'
+            'route must render fully offline (ADR-0008 — no network/tiles):\n'
             '${violations.join('\n')}',
       );
+    });
+
+    test('noLocationOrGpsApiAnywhereInRoute', () {
+      // NFR-2 / TC-817: the georeferencing bounds + coordinates are static
+      // app-shipped constants — never a device-location read.
+      const locationTokens = <String>[
+        'geolocator',
+        'package:location',
+        'CoreLocation',
+        'getCurrentPosition',
+        'LocationPermission',
+      ];
+      final code = codeFor(routeFiles);
+      final violations = <String>[];
+      code.forEach((rel, src) {
+        for (final token in locationTokens) {
+          if (src.contains(token)) {
+            violations.add('$rel contains location token "$token"');
+          }
+        }
+      });
+      expect(violations, isEmpty, reason: violations.join('\n'));
+    });
+
+    test('baseMapRepositoryUsesFlutterServicesForAssetsOnly_notNetwork', () {
+      // The base map's ONLY input is the bundled asset read through
+      // rootBundle/AssetBundle. `flutter/services` is present (allowed), but the
+      // file must add NO network client — proving the "no new egress" promise
+      // (TC-816) at the source that replaced the OSM tile fetch.
+      final src = codeFor(<String>[_baseMapRepository])[_baseMapRepository]!;
+      expect(
+        src.contains('package:flutter/services.dart'),
+        isTrue,
+        reason: 'base map repo is expected to read the bundled asset',
+      );
+      for (final token in forbiddenNetwork) {
+        expect(
+          src.contains(token),
+          isFalse,
+          reason: '$_baseMapRepository must not add a network client ("$token")',
+        );
+      }
     });
   });
 }

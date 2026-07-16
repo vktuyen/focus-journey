@@ -1,24 +1,22 @@
 /// Presentation layer. The shared real-geography map surface used BOTH inline on
-/// the journey tab and full-screen: a `flutter_map` [FlutterMap] with an OSM
-/// [TileLayer] (attribution shown — AC-11), a base-road [PolylineLayer]
-/// (projected real geography — AC-4), a red overlay for idle stretches
-/// (solid=voluntary / dashed=lock-sleep — AC-6/AC-9/NFR-3), and a [MarkerLayer]
-/// for checkpoint pins + the current-position marker (AC-5/AC-10).
+/// the journey tab and full-screen: a `flutter_map` [FlutterMap] whose base is
+/// the bundled, offline Vietnam 34-province [PolygonLayer] (vietnam-map-fidelity
+/// / ADR-0008 — always renders, even with no network), with the shipped overlays
+/// drawn ON TOP: a base-road [PolylineLayer] (projected real geography), a red
+/// overlay for idle stretches (solid=voluntary / dashed=lock-sleep —
+/// AC-8/NFR-3), and a [MarkerLayer] for checkpoint pins + the current-position
+/// marker. An in-app CC BY-SA 3.0 attribution credits the bundled base (AC-9).
 ///
-/// SEPARATION / PRIVACY INVARIANT (AC-12 / NFR-2 / TC-227/TC-230/TC-231): reads
-/// ONLY the injected [MapViewState] (derived purely from the engine's aggregate
-/// snapshot + the route selection, projected onto STATIC [ProvinceGeography]
-/// reference data). It imports NO `ActivityPlugin`, NO `MethodChannel`, NO
-/// geolocation/GPS, makes NO active-vs-idle decision, and accrues NO distance.
-/// The ONLY network egress is anonymous OSM tile GETs keyed by `{z}/{x}/{y}`
-/// (plus the required static User-Agent) — no user id, no location, no idle data
-/// (TC-231). `flutter_map` is used for static tile display + the static overlay
+/// SEPARATION / PRIVACY INVARIANT (NFR-2 / AC-10): reads ONLY the injected
+/// [MapViewState] + the STATIC bundled [BaseMapGeometry]. It imports NO
+/// `ActivityPlugin`, NO `MethodChannel`, NO geolocation/GPS, makes NO
+/// active-vs-idle decision, and accrues NO distance. ADR-0008(c) DROPPED the OSM
+/// `TileLayer`, so the surface issues ZERO network egress — the base is a
+/// bundled static asset. `flutter_map` renders the static polygons + overlays
 /// only; its camera/marker is never read back as the user's position.
 ///
-/// OFFLINE FALLBACK (AC-11 / TC-218/TC-219): a failed tile fetch is swallowed by
-/// [TileLayer.errorTileCallback] + an [TileLayer.errorImage]; the map's solid
-/// background remains, and the province road / markers / red trace still render
-/// on top — no exception bubbles to the journey tab.
+/// OFFLINE-FIRST (AC-1/AC-2): the base is a bundled asset, so it renders with no
+/// network and can never be a blank/grey canvas or an empty-tile placeholder.
 library;
 
 import 'package:flutter/material.dart';
@@ -26,65 +24,150 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../journey/domain/activity_segment.dart';
+import '../domain/base_map_geometry.dart';
+import '../domain/province_geography.dart';
+import '../domain/route_curve.dart';
+import 'base_map_layer.dart';
 import 'lat_lng_mapper.dart';
 import 'map_view_state.dart';
 
-/// The OSM tile URL template — a standard anonymous `{z}/{x}/{y}` endpoint. No
-/// user identifier, location, or session token is interpolated (TC-231).
-const String kOsmTileUrlTemplate =
-    'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+/// The required in-app attribution for the bundled Wikimedia base map. The base
+/// is CC BY-SA 3.0 (share-alike), so this credit is MANDATORY (AC-9) — unlike
+/// the CC0 scenery art. The shipped GeoJSON is a DERIVATIVE (reprojected,
+/// flattened, and simplified from the source SVG), so the credit states it was
+/// "modified" to satisfy CC BY-SA's attribution + share-alike terms. Kept here
+/// as the single source of the string (also surfaced on the onboarding privacy
+/// card so a journey-tab user who never opens the full map still sees it).
+const String kBaseMapAttribution =
+    'Base map: Vietnam administrative divisions 2025 by TUBS / PIkne — '
+    'modified (reprojected & simplified), CC BY-SA 3.0, via Wikimedia Commons';
 
-/// The package user-agent OSM tile policy requires (a static app identifier, not
-/// user data). Sent as the only non-coordinate part of a tile request (TC-231).
-const String kMapUserAgentPackageName = 'com.focusjourney.app';
+/// The required in-app attribution for the bundled national-road geometry
+/// (route-real-road / NFR-4). The road is OpenStreetMap data under ODbL
+/// (share-alike) → the credit is MANDATORY. Surfaced alongside the base-map
+/// CC BY-SA line on the map attribution pill.
+const String kRoadAttribution = 'Road data © OpenStreetMap contributors, ODbL';
 
-/// The single "drifted off" red the idle trace uses (AC-9: one colour; the cause
+/// The single "drifted off" red the idle trace uses (AC-8: one colour; the cause
 /// is conveyed by the stroke PATTERN, not a second hue).
 const Color kIdleRed = Color(0xFFD32F2F);
 
-/// The base-road colour (a calm slate so the red trace reads clearly on top).
+/// The base-road colour (a calm slate so the red trace reads clearly on top of
+/// the land fill).
 const Color kBaseRoadColor = Color(0xFF37474F);
 
-/// The flat background painted behind the compact minimap (no live tiles). A
-/// muted blue-grey "land" tone so the slate road + red idle trace read clearly.
-const Color kCompactMapBackground = Color(0xFFCAD5DC);
+/// The muted grey of a pass-through checkpoint marker (route-real-road / AC-2) —
+/// de-emphasized so the big start/end/stop markers read as the route's anchors.
+const Color kPassThroughGrey = Color(0xFF9E9E9E);
 
-/// The shared map surface. Renders the projected base road, the red idle trace,
-/// the checkpoint pins, and the current-position marker over an OSM tile base.
-class MapView extends StatelessWidget {
-  /// Creates the map surface from a resolved [state].
+/// The prominent marker colour for the emphasized start / end / stop checkpoints
+/// (route-real-road / AC-2) — the shipped teal pin, kept as the "big" look.
+const Color kEmphasizedMarkerColor = Color(0xFF26A69A);
+
+/// The compact minimap background — the themed sea tone behind the bundled land
+/// polygons (the sea is the app's own background — ADR-0008(b)). Shared with the
+/// minimap card frame in `map_surface.dart`.
+const Color kCompactMapBackground = kSeaBackground;
+
+/// The shared map surface. Renders the bundled offline Vietnam base (34-province
+/// [PolygonLayer]) UNDER the projected base road, the red idle trace, the
+/// checkpoint pins, and the current-position marker. No tiles, no network.
+class MapView extends StatefulWidget {
+  /// Creates the map surface from a resolved [state] over the bundled
+  /// [baseMap] geometry.
   ///
-  /// [tileProvider] is an injectable seam (default: `flutter_map`'s
-  /// `NetworkTileProvider`) so tests can drive a fake success / timeout / error
-  /// provider with no real network (TC-218/TC-219/TC-231).
+  /// [baseMap] is the parsed, cached [BaseMapGeometry] loaded from the bundled
+  /// GeoJSON (injected via the composition root). When `null` / empty, no base
+  /// layer is drawn (back-compat for hosts that inject none). [compact] selects
+  /// the cheaper decimated geometry for the ~150px minimap (NFR-1) and hides the
+  /// per-checkpoint labels/attribution so it stays uncluttered.
   const MapView({
     required this.state,
-    this.tileProvider,
-    this.showTiles = true,
+    this.baseMap,
+    this.compact = false,
     super.key,
   });
 
   /// The resolved map view state (base road, marker, idle stretches).
   final MapViewState state;
 
-  /// Optional tile-provider override (test seam). `null` → OSM network tiles.
-  final TileProvider? tileProvider;
+  /// The bundled base-map geometry drawn beneath the overlays (AC-1/AC-2). When
+  /// `null`, the base layer is omitted (legacy/route-only hosts).
+  final BaseMapGeometry? baseMap;
 
-  /// Whether to render the live OSM [TileLayer] + its attribution pill.
+  /// Whether this is the compact minimap surface.
   ///
-  /// `true` (default) for the full-screen surface — live tiles + the required
-  /// '© OpenStreetMap contributors' attribution (AC-11). `false` for the
-  /// compact minimap (the floating HUD on the journey tab): the polylines,
-  /// markers, and red idle trace are painted over a flat themed background, so
-  /// the minimap is glanceable, stays overflow-safe at ~150px, AND makes NO
-  /// tile network calls at all (strictly fewer GETs — better for NFR-2). The
-  /// OSM tiles + attribution are reserved for the full-screen view, where they
-  /// are legible.
-  final bool showTiles;
+  /// `false` (default) for the full-screen surface — full-resolution base,
+  /// per-checkpoint labels, and the CC BY-SA attribution pill (AC-9). `true`
+  /// for the compact minimap (the floating HUD on the journey tab): the cheaper
+  /// decimated base + bare dots so the minimap stays glanceable and
+  /// overflow-safe at ~150px. Neither mode makes any network call (AC-10).
+  final bool compact;
+
+  @override
+  State<MapView> createState() => _MapViewState();
+}
+
+class _MapViewState extends State<MapView> {
+  // Convenience getters so the render helpers read the widget config unchanged
+  // after the StatelessWidget → StatefulWidget conversion.
+  MapViewState get state => widget.state;
+  BaseMapGeometry? get baseMap => widget.baseMap;
+  bool get compact => widget.compact;
+
+  // Memoized LatLng conversions (route-real-road review S4). The base + road
+  // polylines are ~2,500 vertices; their source GeoCoordinate lists are
+  // identity-stable across ticks (the RoadRoute / projector geometry is
+  // memoized once per route in the cubit). Since the current-position marker
+  // lives in MapViewState, every tick rebuilds this widget — but re-projecting
+  // the whole road per tick is wasted work. We reconvert ONLY when the source
+  // list reference changes; the marker + idle layers still rebuild every tick.
+  List<GeoCoordinate>? _baseSource;
+  List<LatLng> _basePoints = const <LatLng>[];
+  List<GeoCoordinate>? _roadSource;
+  List<LatLng> _roadPoints = const <LatLng>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuildLatLngCaches();
+  }
+
+  @override
+  void didUpdateWidget(covariant MapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _rebuildLatLngCaches();
+  }
+
+  /// Reconverts the base + stroked-road polylines to LatLng only when their
+  /// underlying GeoCoordinate list identity changes (a route change), never on
+  /// a bare distance tick. Keying the road on its SOURCE list (the cubit's
+  /// smoothed curve when present, else the base chords) — rather than on
+  /// `_roadCoordinates()`, which may build a fresh smoothed list in the
+  /// direct-construction fallback — keeps the (possibly expensive) smoothing to
+  /// once per route.
+  void _rebuildLatLngCaches() {
+    final basePts = state.baseRoutePolyline.points;
+    if (!identical(basePts, _baseSource)) {
+      _baseSource = basePts;
+      _basePoints = toLatLngs(basePts);
+    }
+    final smoothed = state.smoothedRoutePolyline.points;
+    final roadSource = smoothed.isNotEmpty ? smoothed : basePts;
+    if (!identical(roadSource, _roadSource)) {
+      _roadSource = roadSource;
+      _roadPoints = toLatLngs(_roadCoordinates());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final basePoints = toLatLngs(state.baseRoutePolyline.points);
+    // Cached LatLng lists (S4) — the checkpoint chords used to fit the camera +
+    // place the pins, and the SMOOTHED curved road the surface strokes
+    // (route-real-road / AC-1). Reconverted only on a route change, above.
+    final basePoints = _basePoints;
+    final roadPoints = _roadPoints;
+    final base = baseMap;
     final map = FlutterMap(
       options: MapOptions(
         // Fit the whole route into view; falls back to a Vietnam-centred default
@@ -92,7 +175,7 @@ class MapView extends StatelessWidget {
         initialCameraFit: basePoints.length >= 2
             ? CameraFit.coordinates(
                 coordinates: basePoints,
-                padding: EdgeInsets.all(showTiles ? 48 : 12),
+                padding: EdgeInsets.all(compact ? 12 : 48),
               )
             : null,
         initialCenter: basePoints.isNotEmpty
@@ -105,41 +188,40 @@ class MapView extends StatelessWidget {
         ),
       ),
       children: <Widget>[
-        if (showTiles) _osmTileLayer(),
-        _baseRoadLayer(basePoints),
+        // The bundled Vietnam base FIRST so every overlay draws on top of it
+        // (z-order: base beneath, overlays above — AC-11).
+        if (base != null) ...buildBaseMapLayers(base, compact: compact),
+        _baseRoadLayer(roadPoints),
         ..._idleTraceLayers(),
         _markerLayer(),
-        if (showTiles) _attribution(),
+        // In-app CC BY-SA credit for the bundled base (AC-9) — full-screen only
+        // (the minimap surfaces it via the shared credit on the full map).
+        if (!compact) _attribution(),
       ],
     );
-    // In compact (minimap) mode there is no tile base, so paint the route over a
-    // flat themed background — keeps the polylines/markers/red trace legible.
-    if (!showTiles) {
-      return ColoredBox(color: kCompactMapBackground, child: map);
+    // The sea is the app's own themed background behind the land polygons
+    // (ADR-0008(b)); paint it on BOTH surfaces so any area outside the landmass
+    // reads as sea, never a blank canvas.
+    return ColoredBox(color: kSeaBackground, child: map);
+  }
+
+  /// The road coordinates to stroke: the cubit's precomputed smoothed curve
+  /// (route-real-road / AC-1) when present, else an inline smoothing of the
+  /// checkpoint chords (direct-construction fallback), else the chords as-is for
+  /// a sub-3-point route (nothing to smooth).
+  List<GeoCoordinate> _roadCoordinates() {
+    final smoothed = state.smoothedRoutePolyline.points;
+    if (smoothed.isNotEmpty) {
+      return smoothed;
     }
-    return map;
+    final chords = state.baseRoutePolyline.points;
+    if (chords.length >= 3) {
+      return smoothCurve(chords);
+    }
+    return chords;
   }
 
-  /// The OSM tile layer with a graceful offline fallback (AC-11): a failed tile
-  /// fetch is swallowed (no rethrow) and an error tile is shown over the map's
-  /// solid background, so the road/markers/red still render and the tab never
-  /// breaks (TC-219).
-  TileLayer _osmTileLayer() {
-    return TileLayer(
-      urlTemplate: kOsmTileUrlTemplate,
-      userAgentPackageName: kMapUserAgentPackageName,
-      tileProvider: tileProvider,
-      // Offline fallback: keep the (possibly stale) tile on error instead of a
-      // blank flash, and never rethrow (TC-219).
-      errorTileCallback: (tile, error, stackTrace) {
-        // Intentionally swallowed: a tile fetch failure must not bubble to the
-        // journey tab (AC-11). The base background + overlay remain visible.
-      },
-      evictErrorTileStrategy: EvictErrorTileStrategy.none,
-    );
-  }
-
-  /// The base road: the projected province polyline (real lat/long, AC-4).
+  /// The base road: the smoothed curved route polyline (real lat/long, AC-1/AC-4).
   PolylineLayer<Object> _baseRoadLayer(List<LatLng> points) {
     return PolylineLayer<Object>(
       polylines: <Polyline<Object>>[
@@ -188,75 +270,186 @@ class MapView extends StatelessWidget {
   /// The checkpoint pins + the current-position marker. The marker is projected
   /// from `routeDistanceKm` (AC-5); at km=0 it sits on the start pin (AC-10).
   ///
-  /// On the FULL-SCREEN surface ([showTiles] == true) each checkpoint also gets
-  /// a legible province-name label under its pin and a desktop hover [Tooltip]
-  /// naming the stop — so the route's stops are identifiable on the real map.
-  /// The compact minimap ([showTiles] == false) keeps bare dots (no labels /
-  /// tooltips) so it stays uncluttered at ~150px (minimap unchanged).
+  /// MARKER HIERARCHY (route-real-road / AC-2/AC-3): a checkpoint whose node id is
+  /// in `state.emphasizedNodeIds` — the **start**, the **end**, and any
+  /// **user-marked stop** — renders as the LARGE prominent marker; every other
+  /// on-route province renders as a SMALL GREY pass-through dot. Each keeps a
+  /// meaningful semantic label + hover tooltip so it stays reachable (NFR-3).
+  ///
+  /// On the FULL-SCREEN surface ([compact] == false) the big markers also carry a
+  /// legible province-name label under the pin. The compact minimap ([compact] ==
+  /// true) keeps bare dots (endpoints/stops slightly larger) so it stays
+  /// uncluttered at ~150px.
   MarkerLayer _markerLayer() {
-    final checkpoints = state.checkpointCoordinates;
-    final labelled = showTiles;
-    final markers = <Marker>[
-      for (var i = 0; i < checkpoints.length; i++)
-        Marker(
-          point: toLatLng(checkpoints[i]),
-          // A labelled checkpoint needs extra room beneath the dot for the
-          // province name; a bare minimap dot stays compact.
-          width: labelled ? 120 : 16,
-          height: labelled ? 44 : 16,
-          // Anchor at the top so the dot stays on the road vertex and the label
-          // hangs below it (labelled mode only).
-          alignment: labelled ? Alignment.topCenter : Alignment.center,
-          // Full-screen: a labelled + hover-tooltipped checkpoint. Minimap:
-          // a bare dot with only its Semantics label (unchanged — no tooltip,
-          // no name label, stays uncluttered at ~150px).
-          child: i < state.orderedNodes.length
-              ? (labelled
-                    ? _CheckpointMarker(name: state.orderedNodes[i].name)
-                    : Semantics(
-                        label: 'Checkpoint ${state.orderedNodes[i].name}',
-                        child: const _CheckpointPin(),
-                      ))
-              : Semantics(label: 'Checkpoint', child: const _CheckpointPin()),
-        ),
-      if (state.markerPosition != null)
-        Marker(
-          point: toLatLng(state.markerPosition!),
-          width: 22,
-          height: 22,
-          child: Semantics(
-            label: 'Your current position on the route',
-            child: const _CurrentPositionMarker(),
+    // route-real-road (AC-3): when the route follows the real road, the ONLY
+    // markers are the waypoints — big on the start, the end, and any user-added
+    // stops. There are NO per-province dots. The markers sit at the REAL province
+    // locations; the drawn line detours off the highway (a spur) to reach each of
+    // them, so every marker still lies on the drawn line.
+    final road = state.roadRoute;
+    final List<Marker> markers;
+    if (road != null && state.waypoints.isNotEmpty) {
+      final coords = road.waypointCoordinates;
+      final lastIndex = state.waypoints.length - 1;
+      markers = <Marker>[
+        for (var i = 0; i < state.waypoints.length && i < coords.length; i++)
+          _checkpointMarker(
+            point: toLatLng(coords[i]),
+            name: state.waypoints[i].name,
+            emphasized: true,
+            isStart: i == 0,
+            isEnd: i == lastIndex,
           ),
-        ),
-    ];
+        if (state.markerPosition != null) _currentPositionMarker(),
+      ];
+    } else {
+      // Legacy/no-road fallback (kept for hosts/tests that inject no road asset):
+      // the chain-projected checkpoint pins, emphasized start/end/stops big.
+      final checkpoints = state.checkpointCoordinates;
+      final lastIndex = checkpoints.length - 1;
+      markers = <Marker>[
+        for (var i = 0; i < checkpoints.length; i++)
+          _checkpointMarker(
+            point: toLatLng(checkpoints[i]),
+            name: i < state.orderedNodes.length
+                ? state.orderedNodes[i].name
+                : null,
+            emphasized:
+                i < state.orderedNodes.length &&
+                state.emphasizedNodeIds.contains(state.orderedNodes[i].id),
+            isStart: i == 0,
+            isEnd: i == lastIndex,
+          ),
+        if (state.markerPosition != null) _currentPositionMarker(),
+      ];
+    }
     return MarkerLayer(markers: markers);
   }
 
-  /// Always-visible OSM attribution (AC-11 / TC-218 — required by OSM
-  /// tile-usage policy). The attribution text is rendered inline (no expand
-  /// button), so '© OpenStreetMap contributors' is legible on BOTH the inline
-  /// (IgnorePointer'd) surface and the full-screen surface — unlike
-  /// [RichAttributionWidget], whose sources stay collapsed behind an "i" button
-  /// that the inline overlay can never reveal. Kept unobtrusive: a small
-  /// translucent pill anchored bottom-right that wraps gracefully in narrow
-  /// surfaces (no overflow).
+  /// The current-position marker (rides the road by the progress fraction — AC-5).
+  Marker _currentPositionMarker() {
+    return Marker(
+      point: toLatLng(state.markerPosition!),
+      width: 22,
+      height: 22,
+      child: Semantics(
+        label: 'Your current position on the route',
+        child: const _CurrentPositionMarker(),
+      ),
+    );
+  }
+
+  /// Builds one checkpoint [Marker], sized + styled by its tier (route-real-road
+  /// / AC-2/AC-3). [emphasized] → the big prominent marker; otherwise the small
+  /// grey pass-through dot. The semantic label names the role (Start / Destination
+  /// / Stop / passing-through) so the tier is recoverable non-visually (NFR-3).
+  Marker _checkpointMarker({
+    required LatLng point,
+    required String? name,
+    required bool emphasized,
+    required bool isStart,
+    required bool isEnd,
+  }) {
+    final displayName = name ?? 'checkpoint';
+    final String semanticLabel;
+    if (isStart) {
+      semanticLabel = 'Start: $displayName';
+    } else if (isEnd) {
+      semanticLabel = 'Destination: $displayName';
+    } else if (emphasized) {
+      semanticLabel = 'Stop: $displayName';
+    } else {
+      semanticLabel = 'Passing through $displayName';
+    }
+
+    if (emphasized) {
+      // Big prominent marker. Full-screen carries the name label beneath the dot
+      // (anchored at the top so the dot stays on the road vertex); the minimap
+      // shows a slightly larger bare dot.
+      return Marker(
+        point: point,
+        width: compact ? 16 : 120,
+        height: compact ? 16 : 48,
+        alignment: compact ? Alignment.center : Alignment.topCenter,
+        child: compact
+            ? Semantics(
+                label: semanticLabel,
+                child: const _CheckpointPin(size: 12),
+              )
+            : _CheckpointMarker(name: displayName, semanticLabel: semanticLabel),
+      );
+    }
+
+    // Small grey pass-through dot — clearly smaller than the big markers
+    // (route-real-road / AC-3 "grey marker too big" fix): ~1/3 the big dot's
+    // size. Full-screen keeps a hover tooltip so the province is still
+    // identifiable; the minimap is a bare tiny grey dot. Both keep a Semantics
+    // label so the province stays reachable (NFR-3).
+    final dot = _PassThroughDot(size: compact ? 4 : 6);
+    final labelled = Semantics(label: semanticLabel, child: dot);
+    return Marker(
+      point: point,
+      width: 16,
+      height: 16,
+      alignment: Alignment.center,
+      child: compact ? labelled : Tooltip(message: displayName, child: labelled),
+    );
+  }
+
+  /// The required in-app CC BY-SA 3.0 credit for the bundled Wikimedia base
+  /// (AC-9). The base is share-alike, so the credit is MANDATORY (unlike the CC0
+  /// art). Rendered inline (no expand button) so [kBaseMapAttribution] is
+  /// legible; a small translucent pill anchored bottom-right that wraps
+  /// gracefully in narrow surfaces (no overflow).
   Widget _attribution() {
-    return const _OsmAttribution();
+    return const _BaseMapAttribution();
   }
 }
 
-/// A small checkpoint dot.
+/// A prominent (emphasized) checkpoint dot — teal with a white ring. Sized by
+/// [size] so the same pin serves the full-screen big marker and the slightly
+/// larger minimap endpoint/stop dot.
 class _CheckpointPin extends StatelessWidget {
-  const _CheckpointPin();
+  const _CheckpointPin({this.size = 16});
+
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF26A69A),
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: kEmphasizedMarkerColor,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+        ),
+      ),
+    );
+  }
+}
+
+/// A tiny, muted grey pass-through checkpoint dot (route-real-road / AC-3) — the
+/// de-emphasized style for a province the sweep merely passes through. Clearly
+/// smaller than the emphasized markers (~1/3 their size), so the start/end/stop
+/// markers stand out (the "grey marker too big" regression fix).
+class _PassThroughDot extends StatelessWidget {
+  const _PassThroughDot({this.size = 6});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: kPassThroughGrey,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1),
+        ),
       ),
     );
   }
@@ -265,19 +458,23 @@ class _CheckpointPin extends StatelessWidget {
 /// A full-screen checkpoint: a teal dot, a desktop hover [Tooltip] naming the
 /// province, and a legible province-name label hanging below the dot. The label
 /// has a translucent dark background + shadow so the text stays readable over
-/// OSM tiles. Screen-reader recoverable via [Semantics] (NFR-3). The dot sits at
+/// the land fill. Screen-reader recoverable via [Semantics] (NFR-3). The dot sits at
 /// the top so it stays on the road vertex while the label hangs beneath it.
 /// (Full-screen only — the compact minimap keeps bare dots, unchanged.)
 class _CheckpointMarker extends StatelessWidget {
-  const _CheckpointMarker({required this.name});
+  const _CheckpointMarker({required this.name, required this.semanticLabel});
 
   final String name;
+
+  /// The role-aware label (Start / Destination / Stop …) recovered by a screen
+  /// reader (NFR-3).
+  final String semanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final dot = Semantics(
-      label: 'Checkpoint $name',
-      child: const SizedBox(width: 16, height: 16, child: _CheckpointPin()),
+      label: semanticLabel,
+      child: const _CheckpointPin(size: 20),
     );
     // Desktop hover tooltip naming the stop (macOS / Windows — NFR-3).
     final hoverable = Tooltip(message: name, child: dot);
@@ -286,7 +483,7 @@ class _CheckpointMarker extends StatelessWidget {
       children: <Widget>[
         hoverable,
         const SizedBox(height: 2),
-        // Legible-over-tiles province name label.
+        // Legible-over-land-fill province name label.
         ExcludeSemantics(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -315,12 +512,12 @@ class _CheckpointMarker extends StatelessWidget {
   }
 }
 
-/// An always-visible, overflow-safe OSM attribution pill (AC-11 / TC-218). The
-/// '© OpenStreetMap contributors' text is rendered directly (no tap to reveal),
-/// anchored bottom-right and constrained so it wraps rather than overflowing on
-/// a narrow inline surface.
-class _OsmAttribution extends StatelessWidget {
-  const _OsmAttribution();
+/// An always-visible, overflow-safe CC BY-SA 3.0 attribution pill for the
+/// bundled Wikimedia base map (AC-9). The [kBaseMapAttribution] text is rendered
+/// directly (no tap to reveal), anchored bottom-right and constrained so it
+/// wraps rather than overflowing on a narrow surface. Share-alike → mandatory.
+class _BaseMapAttribution extends StatelessWidget {
+  const _BaseMapAttribution();
 
   @override
   Widget build(BuildContext context) {
@@ -329,17 +526,31 @@ class _OsmAttribution extends StatelessWidget {
         alignment: Alignment.bottomRight,
         child: Padding(
           padding: const EdgeInsets.all(4),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              child: Text(
-                '© OpenStreetMap contributors',
-                style: TextStyle(color: Colors.white, fontSize: 11),
-                softWrap: true,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Text(
+                      kBaseMapAttribution,
+                      style: TextStyle(color: Colors.white, fontSize: 11),
+                      softWrap: true,
+                    ),
+                    Text(
+                      kRoadAttribution,
+                      style: TextStyle(color: Colors.white, fontSize: 11),
+                      softWrap: true,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

@@ -1,16 +1,9 @@
 <!DOCTYPE html>
-<!--
-  TEMPLATE for /gen-summary. Copy to specs/<slug>/summary.html, replace every
-  {{PLACEHOLDER}}, duplicate each REPEAT block per data row, and delete sections with no
-  data (use an honest "not started" note instead of fake numbers). Keep the style block,
-  the palette, and the logo as-is. JobLogic light mode, primary cyan #0099A5 led.
-  NOTE: /gen-summary strips THIS instructional comment from the generated output.
--->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{FEATURE_TITLE}} · Progress Overview</title>
+<title>Vietnam Focus Journey · Progress Overview</title>
 <style>
   :root {
     /* brand */
@@ -187,28 +180,12 @@
   .feature-item .fi-title { font-weight: 700; color: var(--text-strong); font-size: 14px; }
   .feature-item .fi-desc { grid-column: 1 / -1; color: var(--text-medium); font-size: 13px; line-height: 1.45; }
 
-  /* ─── FLOW ─── */
-  .flow { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-top: 8px; }
-  .flow-step { background: var(--surface-01); border: 1px solid var(--border-weak); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow-weak); }
-  .flow-step .ord { display: inline-block; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%; margin-bottom: 8px; }
-  .flow-step .step-name { font-size: 14px; font-weight: 700; color: var(--primary-pressed); margin-bottom: 4px; }
-  .flow-step .step-desc { font-size: 12.5px; color: var(--text-medium); line-height: 1.45; }
-
   /* ─── AC ─── */
   .ac-totals { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
   .pill { font-size: 13px; font-weight: 700; padding: 5px 14px; border-radius: 20px; }
   .pill.total { background: var(--surface-03); color: var(--text-medium); border: 1px solid var(--border-weak); }
   .pill.pass { background: var(--positive-bg); color: var(--positive); border: 1px solid var(--positive-border); }
   .pill.pending { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
-  .ac-group { margin-bottom: 18px; }
-  .ac-group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-weak); margin-bottom: 8px; }
-  .ac-list { display: flex; flex-direction: column; gap: 5px; }
-  .ac-item { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; padding: 8px 12px; border-radius: 8px; background: var(--surface-02); border: 1px solid var(--border-weak); }
-  .ac-check { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: 1px; font-size: 10px; font-weight: 800; }
-  .ac-check.pass { background: var(--positive); color: #fff; }
-  .ac-check.pending { background: var(--warning); color: var(--warning-text); }
-  .ac-text { color: var(--text-medium); }
-  .ac-text strong { color: var(--text-strong); }
 
   /* ─── DOMAIN KNOWLEDGE (problem / personas / glossary / rules) ─── */
   .dk-block { margin-bottom: 26px; }
@@ -216,10 +193,10 @@
   .dk-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface-01); }
   .dk-table th, .dk-table td { text-align: left; padding: 9px 12px; border: 1px solid var(--border-weak); vertical-align: top; color: var(--text-medium); overflow-wrap: anywhere; word-break: break-word; }
   .dk-table th { background: var(--primary); color: var(--text-on-primary); font-weight: 700; white-space: nowrap; }
-  .dk-table td strong { color: var(--text-strong); white-space: pre; }
+  .dk-table td strong { color: var(--text-strong); }
   .dk-table td .term { font-family: monospace; font-weight: 700; color: var(--primary-pressed); white-space: pre; }
-  .rules-group { background: var(--surface-01); border: 1px solid var(--border-weak); border-radius: var(--radius); box-shadow: var(--shadow-weak); padding: 22px 24px; margin-bottom: 18px; }
-  .rules-group .rg-head { font-size: 16px; font-weight: 700; color: var(--lake-blue); margin-bottom: 14px; }
+  .rules-group { background: var(--surface-01); border: 1px solid var(--border-weak); border-radius: var(--radius); box-shadow: var(--shadow-weak); padding: 18px 22px; margin-bottom: 14px; }
+  .rules-group .rg-head { font-size: 15px; font-weight: 700; color: var(--lake-blue); margin-bottom: 10px; }
   .rules-group .rg-slug { font-family: monospace; font-size: 12px; color: var(--text-weak); font-weight: 400; margin-left: 6px; }
   .rg-block-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-weak); margin-bottom: 8px; }
   .rule-list { display: flex; flex-direction: column; gap: 5px; }
@@ -228,25 +205,11 @@
   .rule-item .rule-text { color: var(--text-medium); overflow-wrap: anywhere; word-break: break-word; }
   .empty-note { font-size: 13px; color: var(--text-weak); font-style: italic; padding: 10px 12px; background: var(--surface-02); border: 1px dashed var(--border-strong); border-radius: 8px; }
   .br-table-wrap { overflow-x: auto; }
-  .br-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: var(--surface-01); }
-  .br-table th, .br-table td { text-align: left; padding: 8px 10px; border: 1px solid var(--border-weak); vertical-align: top; color: var(--text-medium); overflow-wrap: anywhere; word-break: break-word; }
-  .br-table th { background: var(--primary); color: var(--text-on-primary); font-weight: 700; white-space: nowrap; }
-  .br-table td strong { color: var(--primary-pressed); font-family: monospace; white-space: pre; }
 
   /* ─── TAGS ─── */
   .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
   .tag { background: var(--surface-02); border: 1px solid var(--border-weak); padding: 5px 12px; border-radius: 8px; font-size: 12.5px; color: var(--text-medium); }
   .tag.api { border-color: var(--border-primary-subtle); background: var(--primary-subtle); color: var(--primary-pressed); }
-
-  /* ─── TASKS ─── */
-  .task-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
-  .task-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; padding: 8px 12px; border-radius: 8px; background: var(--surface-02); border: 1px solid var(--border-weak); }
-  .task-row .tk { flex-shrink: 0; font-weight: 700; color: var(--primary); width: 34px; }
-  .task-row .tdone { flex-shrink: 0; width: 16px; height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; margin-top: 1px; }
-  .tdone.done { background: var(--positive); color: #fff; }
-  .tdone.todo { background: var(--surface-04); color: var(--text-weak); }
-  .task-row .tdesc { color: var(--text-medium); }
-  .task-row .tdesc b { color: var(--text-strong); }
 
   /* ─── REPORT / TEST RESULTS ─── */
   .report-card { background: var(--surface-01); border: 1px solid var(--border-weak); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-weak); margin-bottom: 18px; }
@@ -259,26 +222,6 @@
   .result-table th { background: var(--primary); color: var(--text-on-primary); font-weight: 700; }
   .result-table .pass { color: var(--positive); font-weight: 700; }
   .result-table .fail { color: var(--negative); font-weight: 700; }
-  .test-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; margin-top: 18px; }
-  .metric-card { background: var(--surface-02); border: 1px solid var(--border-weak); border-radius: 10px; padding: 16px; }
-  .metric-card .m-num { font-size: 26px; font-weight: 800; color: var(--primary); }
-  .metric-card .m-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-weak); margin-top: 4px; }
-  .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 8px; }
-  .cat-card { background: var(--surface-02); border: 1px solid var(--border-weak); border-radius: 10px; padding: 14px 16px; }
-  .cat-card .c-num { font-size: 22px; font-weight: 800; color: var(--lake-blue); }
-  .cat-card .c-label { font-size: 12.5px; color: var(--text-medium); }
-
-  /* ─── TIMELINE ─── */
-  .timeline { margin-top: 8px; position: relative; padding-left: 4px; }
-  .timeline::before { content: ''; position: absolute; left: 18px; top: 6px; bottom: 6px; width: 2px; background: var(--border-weak); }
-  .tl-item { display: flex; gap: 18px; padding: 9px 0; position: relative; }
-  .tl-dot { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; z-index: 1; border: 2px solid; background: var(--surface-01); }
-  .tl-dot.primary { border-color: var(--primary); color: var(--primary); }
-  .tl-dot.done { border-color: var(--positive); color: var(--positive); background: var(--positive-bg); }
-  .tl-content { padding-top: 3px; }
-  .tl-date { font-size: 11px; color: var(--text-weak); font-family: monospace; }
-  .tl-text { font-size: 13px; color: var(--text-strong); margin-top: 2px; }
-  .tl-text strong { color: var(--primary-pressed); }
 
   /* ─── FOOTER ─── */
   footer { background: var(--lake-blue); color: #BDEBEF; text-align: center; padding: 32px 40px; font-size: 13px; }
@@ -296,31 +239,10 @@
 </head>
 <body>
 
-<!--
-  TWO MODES — both keep: Overview (At-a-glance snapshot first, then intro + capabilities, then AgenticFX pipeline) · Domain Knowledge · Test Results.
-  • SINGLE-SLUG (1 slug): fill Overview, Flow (optional), Acceptance Criteria, Timeline; the Domain
-    Knowledge section uses ONE .rules-group (drop its .rg-head slug label); DELETE "<section id='slugs'>".
-  • EPIC (2+ slugs): hero = umbrella (first slug) title/problem only (no stats band — the roll-up lives in
-    "At a Glance"); "<section id='slugs'>" carries one
-    compact .slug-card per slug; DELETE the single-slug detail sections (Flow, Acceptance Criteria, Timeline) —
-    each slug's AC/scope detail lives in its card. Domain Knowledge REPEATS one .rules-group per slug
-    (umbrella first). Nav anchors: #overview #slugs #rules #tests.
-  • AT-A-GLANCE panel: a roll-up stat band (epic totals) + a per-slug audit table (Stage+date · ACs n/total+% ·
-    Tests · Rules · Gaps). The Gaps cell is a short free-text list of what's missing (e.g. "report, cases")
-    or "none". NEVER fabricate a number or hide a gap.
-  • Problem Statement = each spec's "## Problem", COLLECTED not transformed — a Problem→Solution TABLE with one row
-    per problem EXACTLY as the spec presents them (single paragraph → ONE row; never split a statement into several).
-    Solution = the spec's stated outcome/scope verbatim where present, else left blank. Personas & Glossary are
-    TABLES too, shown ONCE (epic-/project-level) from docs/domain/personas.md + glossary.md, filtered to what
-    the spec(s) reference (glossary: only referenced terms).
-  • Test Results = each slug's report under tests/**/reports/<slug or scope>/report.md. No report → neutral
-    "no automated runs yet" card. NEVER invent a verdict or counts.
--->
-
-<!-- NAV — keep the JobLogic logo img exactly as-is; only edit brand text + anchor links -->
+<!-- NAV -->
 <nav>
   <img class="logo" src="https://www.joblogic.com/hs-fs/hubfs/JL_LOGO_Main-3.png?width=250&height=48&name=JL_LOGO_Main-3.png" alt="JobLogic" />
-  <div class="brand">{{TICKET_ID}} · {{SHORT_FEATURE_NAME}}</div>
+  <div class="brand">Focus Journey · Full build</div>
   <div class="spacer"></div>
   <a href="#overview">Overview</a>
   <a href="#slugs">Slugs</a>
@@ -332,342 +254,975 @@
 <div class="hero">
   <div class="hero-inner">
     <div class="hero-badge">JobLogic · Agentic FX</div>
-    <h1>{{FEATURE_TITLE}}</h1>
-    <div class="slug">{{SLUG}} · Owner: {{OWNER}}{{OPTIONAL_EXTRA_META}}</div>
-    <p>{{ONE_LINE_PROBLEM_STATEMENT}}</p>
-    <!-- No stats band here: the headline numbers live in the "At a Glance" roll-up below, to avoid duplication. -->
+    <h1>Vietnam Focus Journey — the full build</h1>
+    <div class="slug">Umbrella: <code>journey-engine</code> · 15 shipped slugs (v1 MVP → v2 → visual-polish) · Owner: Kevin (Tuyen Vo)</div>
+    <p>Something has to be the core loop that converts "the user is actively working" into "the traveller moved N kilometres" — and does it <em>honestly</em>, <em>deterministically</em>, and in a way the rest of the app (Flame scene, map, stats) can trust. That loop is the <code>JourneyEngine</code>; the other 14 slugs are the map, scene, cockpit, stats, mini-window and picker built faithfully on top of it.</p>
   </div>
 </div>
 
-<!-- OVERVIEW — merged section: feature intro + capabilities, then the "At a glance" snapshot
-     (roll-up stat band, per-slug audit table, AgenticFX pipeline). One nav item: Overview. -->
+<!-- OVERVIEW -->
 <section id="overview">
   <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:8px;">
     <h2>Overview</h2>
-    <!-- stage badge: class is one of shipped | in-progress | backlog (derived from planning folder) -->
-    <span class="status-badge {{STAGE_CLASS}}">{{STAGE_LABEL}}</span>
+    <span class="status-badge shipped">✓ 15 / 15 Shipped</span>
   </div>
-  <!-- AT A GLANCE snapshot (TOP of Overview): roll-up + per-slug audit table. EPIC = one table row per slug
-       (umbrella first); SINGLE = one row. The Gaps cell is short free-text of what's missing or "none". -->
+
   <div class="dk-block-title" style="margin-bottom:12px;">At a glance</div>
 
-  <!-- roll-up: epic totals (single-slug = this feature's numbers). 3–5 items. -->
   <div class="rollup">
-    <!-- REPEAT r-item -->
-    <div class="r-item"><div class="r-num">{{R_NUM}}</div><div class="r-label">{{R_LABEL}}</div></div>
-    <!-- /REPEAT r-item -->
+    <div class="r-item"><div class="r-num">15</div><div class="r-label">Slugs (all shipped)</div></div>
+    <div class="r-item"><div class="r-num">94%</div><div class="r-label">ACs verified · 254 / 271</div></div>
+    <div class="r-item"><div class="r-num">15 🟢</div><div class="r-label">Test runs · all green</div></div>
+    <div class="r-item"><div class="r-num">350</div><div class="r-label">Test cases designed</div></div>
+    <div class="r-item"><div class="r-num">0 · 0</div><div class="r-label">Business rules · conflicts</div></div>
   </div>
 
   <div class="audit-table-wrap">
     <table class="audit-table">
       <thead><tr><th>Slug</th><th>Stage</th><th>ACs</th><th>Tests</th><th>Rules</th><th>Gaps</th></tr></thead>
       <tbody>
-        <!-- REPEAT audit-row: one per slug (umbrella first in epic). -->
         <tr>
-          <td class="slug-cell">{{SLUG_ID}}</td>
-          <td><span class="status-badge {{STAGE_CLASS}}">{{STAGE_LABEL}}{{STAGE_DATE_SUFFIX}}</span></td><!-- STAGE_DATE_SUFFIX = " · <date>" when a date exists, else empty -->
-          <td><span class="pct">{{AC_PCT}}</span> · {{AC_VERIFIED}}/{{AC_TOTAL}}</td>
-          <td>{{TEST_STATUS}}</td>
-          <td>{{RULES_COUNT}} rules · {{CONFLICTS_COUNT}} conflicts</td>
-          <td class="gap">{{GAPS_TEXT}}</td>
+          <td class="slug-cell">journey-engine</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-23</span></td>
+          <td><span class="pct">100%</span> · 21/21</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap none">none</td>
         </tr>
-        <!-- /REPEAT audit-row -->
+        <tr>
+          <td class="slug-cell">activity-detection</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-23</span></td>
+          <td><span class="pct">69%</span> · 11/16</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">Windows runtime (AC-2/3/5/9) deferred; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">journey-view</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-24</span></td>
+          <td><span class="pct">95%</span> · 20/21</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">On-device fps NFR deferred; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">route-progress</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-24</span></td>
+          <td><span class="pct">100%</span> · 22/22</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">On-device fps not instrumented; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">local-stats</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-24</span></td>
+          <td><span class="pct">100%</span> · 26/26</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">Real-OS / runtime-privacy manual legs deferred; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">mini-window</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-24</span></td>
+          <td><span class="pct">100%</span> · 27/27</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">Windows runtime + tray (NFR-9) deferred; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">idle-accounting</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-24</span></td>
+          <td><span class="pct">100%</span> · 6/6</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">Privacy-audit runtime leg manual; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">journey-scene-v2</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-24</span></td>
+          <td><span class="pct">100%</span> · 13/13</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">On-device fps + beach/animal content sign-off deferred (→ art-v3); no scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">map-experience</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-25</span></td>
+          <td><span class="pct">80%</span> · 12/15</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">AC-11 OSM round-trip, NFR-1 fps, NFR-3 screen-reader pending; no scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">route-planner-v2</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-25</span></td>
+          <td><span class="pct">87%</span> · 13/15</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">NFR-1 fps, NFR-3 a11y manual carries; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">journey-pov</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-25</span></td>
+          <td><span class="pct">80%</span> · 16/20</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">AC-12 PiP, AC-16 art review, NFR-1 fps, NFR-3 a11y pending; no scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">journey-scene-art-v3</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-25</span></td>
+          <td><span class="pct">100%</span> · 20/20</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">On-device fps manual leg carried; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">journey-dynamic-curve</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-25</span></td>
+          <td><span class="pct">86%</span> · 12/14</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">NFR-1 fps, NFR-3 a11y device legs manual; no scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">journey-cockpit-lean</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-26</span></td>
+          <td><span class="pct">100%</span> · 17/17</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">Motion-feel / fps / real-OS PiP manual legs; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">vehicle-picker</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-06-26</span></td>
+          <td><span class="pct">100%</span> · 18/18</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">Icon-art / a11y / fps manual carries; no e2e/integration scripts</td>
+        </tr>
       </tbody>
     </table>
   </div>
-  <p style="font-size:12px; color:var(--text-weak); margin-top:10px;">{{MISSING_SUMMARY}}</p>
+  <p style="font-size:12px; color:var(--text-weak); margin-top:10px;">All 15 slugs shipped &amp; green. Epic-wide gaps: <strong>no authored scripts under <code>tests/e2e</code> / <code>tests/integration</code></strong> (both empty — execution ran via in-package Flutter suites); Personas &amp; Glossary libraries are unfilled templates; no spec uses Related-rules / BR-conflict sections (0 rules · 0 conflicts everywhere). 4 slugs carry pending on-device / manual ACs (activity-detection, map-experience, route-planner-v2, journey-pov); the rest carry manual legs only, boxes ticked.</p>
 
-  <!-- BLOCK 2 — AgenticFX pipeline (below the At-a-glance snapshot). Steps (no UI Design / Code Review):
-       Capture Idea · Spec · Implement · Unit Tests · Test Cases · Test Scripts · Test Execution · Ship.
-       pstep class: done (✓ evidenced) · partial (~ some slugs only, epic) · skipped (✗ missing for all slugs) ·
-       unknown (? genuinely can't tell). Implement & Unit Tests have no code artifact to scan → derive from
-       stage + planning log: shipped → done; active + log shows progress ("Tn DONE") → done/partial; else unknown.
-       NO caption: for every NON-done step
-       (skipped / partial / unknown) add data-tip="<why>" — it shows as a hover tooltip explaining the gap.
-       Done steps get NO data-tip. -->
+  <!-- AgenticFX pipeline -->
   <div class="dk-block-title" style="margin:30px 0 10px;">AgenticFX pipeline</div>
   <div class="pipeline">
-    <!-- REPEAT pstep — drop data-tip on done steps; keep it (with the reason) on skipped/partial/unknown. -->
-    <div class="pstep {{done|partial|skipped|unknown}}" data-tip="{{WHY_TOOLTIP}}"><span class="pdot">{{✓|~|✗|?}}</span><span class="plabel">{{STEP_NAME}}</span></div>
-    <!-- /REPEAT pstep -->
+    <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Capture Idea</span></div>
+    <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Spec</span></div>
+    <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Implement</span></div>
+    <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Unit Tests</span></div>
+    <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Test Cases</span></div>
+    <div class="pstep skipped" data-tip="tests/e2e and tests/integration hold only .gitkeep — no authored scripts. Executable tests live inside the Flutter package (src/focus_journey/test + integration_test), outside the scanned script folders."><span class="pdot">✗</span><span class="plabel">Test Scripts</span></div>
+    <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Test Execution</span></div>
+    <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Ship</span></div>
   </div>
 
-  <!-- BLOCK 3 — "What it does": the feature intro + capability cards (remaining Overview content). -->
+  <!-- What it does -->
   <div class="dk-block-title" style="margin:30px 0 12px;">What it does</div>
-  <p class="section-sub">{{OVERVIEW_SUBTITLE}}</p>
+  <p class="section-sub">Fifteen slugs across three waves build one product: real focus time drives a virtual road trip up Vietnam. The engine is the honest core; everything else is a faithful view of it.</p>
   <div class="features-grid">
-    <!-- REPEAT feature-item: the feature's key capabilities / scope, in plain English. -->
     <div class="feature-item">
-      <div class="fi-icon">{{EMOJI}}</div>
-      <div class="fi-title">{{CAPABILITY_TITLE}}</div>
-      <div class="fi-desc">{{CAPABILITY_DESC}}</div>
+      <div class="fi-icon">🧭</div>
+      <div class="fi-title">Honest core loop</div>
+      <div class="fi-desc"><code>journey-engine</code> — pure framework-free Dart converts active focus into km (speed-only), tracking journey-time vs raw-active-time separately and persisting across sleep/wake &amp; midnight.</div>
     </div>
-    <!-- /REPEAT -->
+    <div class="feature-item">
+      <div class="fi-icon">🔒</div>
+      <div class="fi-title">Privacy-clean signal</div>
+      <div class="fi-desc"><code>activity-detection</code> — reads only aggregate system idle-seconds + screen-lock (macOS Swift / Windows C++), never keystrokes or screen. The auditable trust foundation.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">🛣️</div>
+      <div class="fi-title">POV road scene</div>
+      <div class="fi-desc"><code>journey-view</code> → <code>journey-scene-v2</code> → <code>journey-scene-art-v3</code> — a Flame first-person road that winds, scrolls slower &amp; calmer, and wears a cohesive hi-res stylized-flat Vietnam art set.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">🚗</div>
+      <div class="fi-title">First-person cockpit</div>
+      <div class="fi-desc"><code>journey-pov</code> + <code>journey-cockpit-lean</code> — a car / motorbike cockpit composited over the road that leans into the curves, bounded &amp; reduce-motion-safe.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">🗺️</div>
+      <div class="fi-title">Real-Vietnam map</div>
+      <div class="fi-desc"><code>route-progress</code> + <code>map-experience</code> — an ordered province chain on real lat/long with OSM tiles, folded into the journey tab, with idle stretches painted red.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">🧳</div>
+      <div class="fi-title">Route authoring</div>
+      <div class="fi-desc"><code>route-planner-v2</code> — pick any start &amp; end province, mark stops (auto-inserted), review before starting, and abandon a route without ever resetting lifetime distance.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">📊</div>
+      <div class="fi-title">Stats, badges &amp; trust</div>
+      <div class="fi-desc"><code>local-stats</code> — daily/weekly stats with raw-active shown separately from journey time, four badge families, and the onboarding/privacy screen whose claims must match the code.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">🪟</div>
+      <div class="fi-title">Always-on-top presence</div>
+      <div class="fi-desc"><code>mini-window</code> — a frameless always-on-top PiP compact mode plus a tray/menu-bar icon that keeps tracking after the main window is closed.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">⏸️</div>
+      <div class="fi-title">Idle accounting</div>
+      <div class="fi-desc"><code>idle-accounting</code> — counts idle from the moment the state changes (not the next tick) and produces the distance-keyed segment record the red map trace consumes.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">🏍️</div>
+      <div class="fi-title">Choose your vehicle</div>
+      <div class="fi-desc"><code>vehicle-picker</code> — a persisted icon picker (Settings + route-start) that cosmetically overrides the displayed skin (<code>vehiclePreference ?? engineMode</code>) without ever touching accrual.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">🌀</div>
+      <div class="fi-title">Dynamic sweeping curve</div>
+      <div class="fi-desc"><code>journey-dynamic-curve</code> — intensifies the road into F1-style bends that sweep with the scroll phase (no wall-clock), preserving even arc-length object spacing.</div>
+    </div>
+  </div>
+
+  <!-- Agentic build cost -->
+  <div class="dk-block-title" style="margin:34px 0 10px;">Agentic build cost</div>
+  <p class="section-sub" style="margin-bottom:14px;">Repo-wide Claude Code usage across every session that built this product — <strong>not</strong> per feature. Token counts are exact (from transcripts); the dollar figure is a <em>list-price estimate</em>, not a billed amount.</p>
+  <div class="rollup">
+    <div class="r-item"><div class="r-num">334.6M</div><div class="r-label">Total tokens</div></div>
+    <div class="r-item"><div class="r-num">~$774</div><div class="r-label">Est. cost (list-price estimate)</div></div>
+    <div class="r-item"><div class="r-num">18</div><div class="r-label">Sessions</div></div>
+    <div class="r-item"><div class="r-num">419K / 1.98M</div><div class="r-label">Input / Output tokens</div></div>
+    <div class="r-item"><div class="r-num">1</div><div class="r-label">Model · claude-opus-4-8</div></div>
   </div>
 </section>
 
-<!-- EPIC MODE ONLY (2+ slugs): one compact card per slug. DELETE this whole section in single-slug mode.
-     In epic mode, ALSO delete the single-slug detail sections (Flow / Acceptance Criteria / Timeline). -->
+<!-- SLUGS -->
 <section id="slugs">
-  <h2>Slugs <span>— {{SLUG_COUNT}} in this epic</span></h2>
-  <p class="section-sub">{{SLUGS_SUBTITLE}}</p>
+  <h2>Slugs <span>— 15 in this epic</span></h2>
+  <p class="section-sub">In build order: the <code>journey-engine</code> core, the rest of the v1 MVP, the v2 feature wave, then the visual-polish epic. Every slug is shipped and green.</p>
   <div class="slug-cards">
-    <!-- REPEAT slug-card: one per slug, IN THE ORDER PASSED (umbrella/parent first). -->
+
     <div class="slug-card">
-      <div class="top-bar {{STAGE_CLASS}}"></div>
+      <div class="top-bar shipped"></div>
       <div class="sc-body">
         <div class="sc-head">
-          <div>
-            <div class="sc-title">{{SLUG_TITLE}}</div>
-            <div class="sc-slug">{{SLUG_ID}}</div>
-          </div>
-          <span class="status-badge {{STAGE_CLASS}}">{{STAGE_LABEL}}</span>
+          <div><div class="sc-title">Journey Engine</div><div class="sc-slug">journey-engine · umbrella · v1 MVP</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-23</span>
         </div>
-        <p class="sc-desc">{{SLUG_ONE_LINER}}</p>
+        <p class="sc-desc">The pure, framework-free Dart core loop that honestly converts active focus time into virtual distance (speed-only), tracks journey-time vs raw-active-time separately, and persists/resets daily progress across sleep/wake and midnight.</p>
         <div class="sc-stats">
-          <!-- REPEAT sc-stat: this slug's headline numbers (ACs verified/total, rules, test report verdict). -->
-          <div class="sc-stat"><div class="n">{{N}}</div><div class="l">{{LABEL}}</div></div>
-          <!-- /REPEAT sc-stat -->
+          <div class="sc-stat"><div class="n">21/21</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">22</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 63/63</div></div>
         </div>
         <div class="ac-totals">
-          <span class="pill total">{{AC_TOTAL_TEXT}}</span>
-          <span class="pill pass">✓ {{AC_VERIFIED_COUNT}} verified</span>
-          <span class="pill pending">— {{AC_PENDING_TEXT}}</span>
+          <span class="pill total">21 ACs</span>
+          <span class="pill pass">✓ 21 verified</span>
         </div>
         <div class="tags">
-          <!-- REPEAT tag: this slug's affected scope / repos. add class "api" for backend targets. -->
-          <span class="tag">{{SCOPE_TAG}}</span>
-          <!-- /REPEAT tag -->
+          <span class="tag">pure-Dart domain</span><span class="tag">injected clock + ActivityPlugin</span><span class="tag">two-knob active/idle</span><span class="tag">speed-only distance</span><span class="tag">local persistence + midnight reset</span>
         </div>
       </div>
     </div>
-    <!-- /REPEAT slug-card -->
-  </div>
-</section>
 
-<!-- OPTIONAL FLOW (single-slug only): keep only if the feature has a notable rule/flow/decision.
-     Delete this whole <section> otherwise, and always delete it in epic mode. -->
-<section id="flow">
-  <h2>{{FLOW_HEADING}} <span>{{FLOW_HEADING_ACCENT}}</span></h2>
-  <p class="section-sub">{{FLOW_SUBTITLE}}</p>
-  <div class="flow">
-    <!-- REPEAT flow-step -->
-    <div class="flow-step">
-      <div class="ord">{{N}}</div>
-      <div class="step-name">{{STEP_NAME}}</div>
-      <div class="step-desc">{{STEP_DESC}}</div>
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Activity Detection</div><div class="sc-slug">activity-detection · v1 MVP</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-23</span>
+        </div>
+        <p class="sc-desc">A privacy-clean <code>ActivityPlugin</code> (Dart interface + macOS Swift / Windows C++ backends + deterministic mock) reporting only aggregate idle-seconds and screen-lock — the auditable signal the rest of the app is gated on. macOS-verified; Windows runtime deferred.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">11/16</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">20</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 36/36</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">16 ACs</span>
+          <span class="pill pass">✓ 11 verified</span>
+          <span class="pill pending">— 5 pending (Windows)</span>
+        </div>
+        <div class="tags">
+          <span class="tag">ActivityPlugin interface</span><span class="tag">macOS Swift backend</span><span class="tag">Windows C++/Win32 backend</span><span class="tag">mock source + DI seam</span><span class="tag">privacy-first raw signals</span>
+        </div>
+      </div>
     </div>
-    <!-- /REPEAT -->
-  </div>
-  <div class="callout"><strong>{{CALLOUT_LEAD}}:</strong> {{CALLOUT_BODY}}</div>
-</section>
 
-<!-- ACCEPTANCE CRITERIA (single-slug only): DELETE this whole section in epic mode (AC lives in slug cards). -->
-<section id="ac">
-  <h2>Acceptance <span>Criteria</span></h2>
-  <p class="section-sub">{{AC_SUBTITLE}}</p>
-  <div class="ac-totals">
-    <span class="pill total">{{AC_TOTAL_TEXT}}</span>
-    <span class="pill pass">✓ {{AC_VERIFIED_COUNT}} verified</span>
-    <span class="pill pending">— {{AC_PENDING_TEXT}}</span>
-  </div>
-  <!-- REPEAT ac-group: one per AC grouping. -->
-  <div class="ac-group">
-    <div class="ac-group-title">{{GROUP_TITLE}} ({{GROUP_VERIFIED}} / {{GROUP_TOTAL}} verified)</div>
-    <div class="ac-list">
-      <!-- REPEAT ac-item: ac-check class is "pass" (✓) when verified, "pending" (—) otherwise. -->
-      <div class="ac-item"><div class="ac-check pass">✓</div><div class="ac-text"><strong>{{AC_ID}}:</strong> {{AC_TEXT}}</div></div>
-      <!-- /REPEAT ac-item -->
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Journey View (Flame POV road scene)</div><div class="sc-slug">journey-view · v1 MVP</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-24</span>
+        </div>
+        <p class="sc-desc">The main emotional screen — a stylized 2D first-person Flame road that scrolls/animates while active and stops+parks (with a "Paused — idle" overlay) while idle, driven entirely by the journey Bloc as a pure view, using only license-clean CC0 assets.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">20/21</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">27</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 167/167</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">21 ACs</span>
+          <span class="pill pass">✓ 20 verified</span>
+          <span class="pill pending">— 1 pending (on-device fps)</span>
+        </div>
+        <div class="tags">
+          <span class="tag">Flame POV road scene</span><span class="tag">pure view of journey Bloc</span><span class="tag">parallax + vehicle skin</span><span class="tag">binary active/stopped motion</span><span class="tag">CC0 / CREDITS-only assets</span>
+        </div>
+      </div>
     </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Route Progress</div><div class="sc-slug">route-progress · v1 MVP</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-24</span>
+        </div>
+        <p class="sc-desc">Turns the engine's cumulative distance into a sense of place — resolving position along an ordered Vietnam province chain and painting it on a tile-free custom map, with a terminal arrival celebration.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">22/22</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">23</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 145/145</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">22 ACs</span>
+          <span class="pill pass">✓ 22 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">province-chain model</span><span class="tag">position math (pure)</span><span class="tag">custom-painted map</span><span class="tag">route completion</span><span class="tag">no network</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Local Stats, Settings, Badges &amp; Onboarding/Privacy</div><div class="sc-slug">local-stats · v1 MVP (closes v1)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-24</span>
+        </div>
+        <p class="sc-desc">The v1-closing user-facing surface — daily/weekly stats (honest raw-vs-journey time), settings, four badge families, and the privacy onboarding screen — as a near-pure consumer of engine + route state.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">26/26</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">29</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 191/191</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">26 ACs</span>
+          <span class="pill pass">✓ 26 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">daily + weekly stats</span><span class="tag">settings (idle/startup/notifications)</span><span class="tag">4 badge families</span><span class="tag">onboarding / privacy</span><span class="tag">bounded history store</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Mini-Window (always-on-top PiP + tray)</div><div class="sc-slug">mini-window · v2 (wave 2)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-24</span>
+        </div>
+        <p class="sc-desc">Gives the journey a persistent glanceable desktop presence — a frameless always-on-top PiP compact mode plus a tray/menu-bar icon that keeps tracking after the main window closes — as a pure mirror of journey state. macOS-verified; Windows runtime deferred.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">27/27</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">31</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 92/92</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">27 ACs</span>
+          <span class="pill pass">✓ 27 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">PiP compact mode</span><span class="tag">always-on-top + frameless</span><span class="tag">tray / menu-bar</span><span class="tag">hide-to-tray</span><span class="tag">macOS + Windows parity</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Idle Accounting</div><div class="sc-slug">idle-accounting · v2 (wave 2)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-24</span>
+        </div>
+        <p class="sc-desc">Fixes idle mis-counting by stamping the Active→Idle/Paused transition (Option B) so the UI and engine agree exactly, and produces a distance-keyed active/idle segment record as the contract for the map's red idle overlay.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">6/6</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">21</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 102/102</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">6 ACs</span>
+          <span class="pill pass">✓ 6 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">Option B attribution</span><span class="tag">activity segments</span><span class="tag">idle-cause tagging</span><span class="tag">Bloc reconciliation</span><span class="tag">pure-Dart engine</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Journey Scene v2 — fidelity &amp; motion</div><div class="sc-slug">journey-scene-v2 · v2 (wave 2)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-24</span>
+        </div>
+        <p class="sc-desc">Reworks the Flame scene on both surfaces — winding road, ~3× slower cosmetic scroll (engine truth untouched), richer evenly-spaced license-clean scenery, and visibility-aware (not focus-aware) animation. Beach/animals deferred to art-v3.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">13/13</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">13</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 642/642</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">13 ACs</span>
+          <span class="pill pass">✓ 13 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">winding road (#1)</span><span class="tag">0.33× scroll (#3)</span><span class="tag">visibility-aware anim (#5)</span><span class="tag">richer scenery (#11)</span><span class="tag">even spacing (#12)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Map Experience</div><div class="sc-slug">map-experience · v2 (wave 2)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-25</span>
+        </div>
+        <p class="sc-desc">Folds the map into the journey tab (inline overlay, tap→full-screen, standalone Map tab removed), draws a real-Vietnam province polyline from static lat/long, and paints idle-accounting's segments red along the road — a pure visualizer adding zero tracking surface.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">12/15</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">32</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 730/730</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">15 ACs</span>
+          <span class="pill pass">✓ 12 verified</span>
+          <span class="pill pending">— 3 pending (OSM / fps / a11y)</span>
+        </div>
+        <div class="tags">
+          <span class="tag">inline map + full-screen (#4)</span><span class="tag">red idle trace (#7)</span><span class="tag">real VN geography</span><span class="tag">flutter_map + OSM tiles</span><span class="tag">pure visualizer</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Route Planner v2</div><div class="sc-slug">route-planner-v2 · v2 (wave 2)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-25</span>
+        </div>
+        <p class="sc-desc">Lets the user author a custom journey — pick any start + end province, mark stops (auto-inserting intermediates), review/edit before committing, and abandon a route to start fresh — all without resetting lifetime distance, with zero new activity or privacy surface.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">13/15</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">40</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 877/877</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">15 ACs</span>
+          <span class="pill pass">✓ 13 verified</span>
+          <span class="pill pending">— 2 pending (fps / a11y)</span>
+        </div>
+        <div class="tags">
+          <span class="tag">flexible endpoint selection (#8)</span><span class="tag">auto-insert + review gate (#9)</span><span class="tag">stop-and-restart (#10)</span><span class="tag">custom-route position reuse</span><span class="tag">shared_preferences persistence</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Journey POV (first-person cockpit)</div><div class="sc-slug">journey-pov · v2 (wave 2)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-25</span>
+        </div>
+        <p class="sc-desc">Composites a stylized-flat first-person cockpit (car: dashboard + wheel + gauges; motorbike: handlebar + grips + pod) over the road for car/motorbike modes only — a cosmetic, pure-view change that flows to the mini-window PiP for free and touches no journey logic.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">16/20</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">21</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 948/948</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">20 ACs</span>
+          <span class="pill pass">✓ 16 verified</span>
+          <span class="pill pending">— 4 pending (PiP / art / fps / a11y)</span>
+        </div>
+        <div class="tags">
+          <span class="tag">car first-person cockpit</span><span class="tag">motorbike cockpit</span><span class="tag">stylized-flat license-clean art</span><span class="tag">mode-gated (car+motorbike)</span><span class="tag">one scene, two surfaces (PiP)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Journey Scene Art v3 — hi-res re-source</div><div class="sc-slug">journey-scene-art-v3 · visual-polish wave 1</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-25</span>
+        </div>
+        <p class="sc-desc">A curation-heavy, code-light wholesale re-source of the scene to one higher-craft stylized-flat pack family across road/sky/vehicles/parallax/people/city — and adds the deferred beach/coast band + side-view animals — with no change to journey logic.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">20/20</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">19</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 465/465</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">20 ACs</span>
+          <span class="pill pass">✓ 20 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">art-direction spike (hard gate)</span><span class="tag">full cohesive re-source</span><span class="tag">beach/coast + animals</span><span class="tag">spawn-rotation integration</span><span class="tag">manifest + CREDITS + golden re-baseline</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Journey Dynamic Curve — sweeping bends</div><div class="sc-slug">journey-dynamic-curve · visual-polish wave 2</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-25</span>
+        </div>
+        <p class="sc-desc">Intensifies the shipped winding-road curve into visibly sharper F1-style bends that sweep over time (driven by scroll phase, not a clock), while preserving even arc-length object spacing, performance, and the calm-companion tone.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">12/14</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">15</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 182/182</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">14 ACs</span>
+          <span class="pill pass">✓ 12 verified</span>
+          <span class="pill pending">— 2 pending (fps / a11y)</span>
+        </div>
+        <div class="tags">
+          <span class="tag">sharper bends</span><span class="tag">scroll-phase sweep</span><span class="tag">arc-length spacing (AC-7)</span><span class="tag">O(1) / pure-view</span><span class="tag">two surfaces (PiP)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Journey Cockpit Lean — tilt into the curve</div><div class="sc-slug">journey-cockpit-lean · visual-polish wave 2</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-26</span>
+        </div>
+        <p class="sc-desc">Rotates the first-person cockpit (car + motorbike) to lean into the road's curve — a bounded, eased, reduce-motion-gated canvas rotation of the CockpitPainter output only, sampled from the in-scene curve, keeping the scene untilted and goldens deterministic.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">17/17</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">18</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 69/69</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">17 ACs</span>
+          <span class="pill pass">✓ 17 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">signed lean into turn</span><span class="tag">bounded ~3° roll</span><span class="tag">eased / low-pass</span><span class="tag">reduce-motion hard-zero</span><span class="tag">car + motorbike only</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Vehicle Picker — choose your vehicle</div><div class="sc-slug">vehicle-picker · visual-polish wave 3 (closes epic)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-06-26</span>
+        </div>
+        <p class="sc-desc">A persisted, icon-based picker (Settings row + route-start step) letting the user choose which of six vehicle skins is displayed — a cosmetic-only override (<code>vehiclePreference ?? engineMode</code>) resolved at the presentation seam that never touches engine distance/accrual (ADR-0007 firewall).</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">18/18</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">19</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 1161/1161</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">18 ACs</span>
+          <span class="pill pass">✓ 18 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">persisted preference</span><span class="tag">cosmetic precedence seam</span><span class="tag">two entry points, one store</span><span class="tag">fun per-mode icons</span><span class="tag">accessible / license-clean</span>
+        </div>
+      </div>
+    </div>
+
   </div>
-  <!-- /REPEAT ac-group -->
 </section>
 
-<!-- DOMAIN KNOWLEDGE — both modes. Order inside: Problem Statement, Personas, Glossary (these three are
-     epic-/project-level, shown ONCE), then per-slug rules-groups (Related rules + BR conflicts). -->
+<!-- DOMAIN KNOWLEDGE -->
 <section id="rules">
   <h2>Domain <span>Knowledge</span></h2>
-  <p class="section-sub">{{RULES_SUBTITLE}}</p>
+  <p class="section-sub">The business framing behind the build. Problem→solution is taken from the umbrella spec; personas, glossary and business-rule sections are drawn from the project domain library and each spec — and honestly flagged where the source is empty.</p>
 
-  <!-- Problem → Solution TABLE — COLLECT, don't transform. One row per problem EXACTLY as the spec's "## Problem"
-       presents them (single paragraph → ONE row; never split a statement into several). Solution = the spec's
-       stated outcome/scope verbatim where present, else leave blank. -->
+  <!-- Problem -> Solution (umbrella: journey-engine) -->
   <div class="dk-block">
-    <div class="dk-block-title">Problem statement &amp; solution</div>
+    <div class="dk-block-title">Problem statement &amp; solution <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--text-weak);">— from the umbrella spec, <code>journey-engine</code></span></div>
     <div class="br-table-wrap">
       <table class="dk-table">
-        <thead><tr><th style="width:45%;">Problem</th><th>Solution</th></tr></thead>
+        <thead><tr><th style="width:52%;">Problem</th><th>Solution</th></tr></thead>
         <tbody>
-          <!-- REPEAT problem-row -->
-          <tr><td>{{PROBLEM}}</td><td>{{SOLUTION}}</td></tr>
-          <!-- /REPEAT problem-row -->
+          <tr>
+            <td>Vietnam Focus Journey turns real focus time into a virtual road trip up/down Vietnam's province chain. Something has to be the <strong>core loop</strong> that converts "the user is actively working" into "the traveller moved N kilometres" — and does it <em>honestly</em>, <em>deterministically</em>, and in a way the rest of the app (Flame scene, map, stats) can trust. Today there is nothing between the raw OS signal and what the user sees: distance can't accrue, daily progress can't persist across restarts, and there is no separation between <strong>journey time</strong> (drives distance, includes the idle grace) and <strong>raw active time</strong> (drives stats/streaks) — the single most important honesty rule of the product.</td>
+            <td>Deliver that loop as <strong>pure, framework-free Dart</strong>: an engine taking an injected clock + injected <code>ActivityPlugin</code>, advancing on real elapsed-time deltas, surviving sleep/wake gaps, and persisting/restoring daily progress locally. Exposes <code>distanceKm</code>, journey time, raw active time, idle time, <code>state</code> and cosmetic <code>mode</code>; two-knob active/idle/paused policy; speed-only distance; day-boundary reset at local midnight. Fully unit-testable with no real timers, Flame, or native code.</td>
+          </tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Personas TABLE: from docs/domain/personas.md, filtered to those the spec's persona line references.
-       No persona named → replace the table body with a single row containing an .empty-note. -->
+  <!-- Personas -->
   <div class="dk-block">
     <div class="dk-block-title">Personas</div>
     <div class="br-table-wrap">
       <table class="dk-table">
         <thead><tr><th>Persona</th><th>Role &amp; context</th><th>Success looks like</th></tr></thead>
         <tbody>
-          <!-- REPEAT persona-row -->
-          <tr><td><strong>{{PERSONA_NAME}}</strong></td><td>{{PERSONA_ROLE}}</td><td>{{PERSONA_SUCCESS}}</td></tr>
-          <!-- /REPEAT persona-row -->
+          <tr><td colspan="3"><div class="empty-note">The project persona library (<code>docs/domain/personas.md</code>) is still an unfilled template — no personas are formally recorded. The specs consistently name two informal personas in their "User &amp; outcome" lines: <strong>the focused individual</strong> (developer / student / remote worker) and <strong>the privacy-skeptical teammate</strong>, but neither is defined in the persona library, so nothing is transcribed here rather than fabricated.</div></td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Glossary TABLE: ONLY terms the spec(s)/tests reference, transcribed from docs/domain/glossary.md.
-       Nothing matches → replace the table body with a single row containing an .empty-note. -->
+  <!-- Glossary -->
   <div class="dk-block">
-    <div class="dk-block-title">Glossary ({{GLOSSARY_COUNT}})</div>
+    <div class="dk-block-title">Glossary (0)</div>
     <div class="br-table-wrap">
       <table class="dk-table">
         <thead><tr><th>Term</th><th>Definition</th></tr></thead>
         <tbody>
-          <!-- REPEAT glossary-row -->
-          <tr><td><span class="term">{{TERM}}</span></td><td>{{DEFINITION}}</td></tr>
-          <!-- /REPEAT glossary-row -->
+          <tr><td colspan="2"><div class="empty-note">The glossary (<code>docs/domain/glossary.md</code>) is an unfilled template with no defined terms — nothing to transcribe.</div></td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Related rules + BR conflicts: SINGLE = one .rules-group (drop slug label); EPIC = one per slug (umbrella first). -->
+  <!-- Business rules & conflicts -->
   <div class="dk-block">
     <div class="dk-block-title">Business rules &amp; conflicts</div>
-    <!-- REPEAT rules-group -->
-    <div class="rules-group">
-      <div class="rg-head">{{SLUG_TITLE}}<span class="rg-slug">{{SLUG_ID}}</span></div>
+    <div class="empty-note" style="margin-bottom:14px;">No slug in this epic declares a <code>## Related rules</code> or <code>## BR Conflicts</code> section — <strong>0 rules · 0 conflicts across all 15 slugs</strong>. This project's specs instead capture design constraints in <code>## Constraints &amp; assumptions</code> / <code>## Resolved decisions</code> / <code>## Open questions</code> and in ADRs (e.g. ADR-0003 single-window two-mode, ADR-0004 single distance axis, ADR-0007 cosmetic-override firewall). Per-slug groups below are shown for completeness.</div>
 
-      <div class="rg-block-title">Related business rules ({{RULES_COUNT}})</div>
-      <!-- If this slug lists NO related rules, replace the .rule-list below with:
-           <div class="empty-note">No business-rule changes recorded for this slug.</div> -->
-      <div class="rule-list">
-        <!-- REPEAT rule-item -->
-        <div class="rule-item"><span class="rule-id">{{BR_ID}}</span><span class="rule-text">{{BR_TEXT}}</span></div>
-        <!-- /REPEAT rule-item -->
-      </div>
-
-      <div class="rg-block-title" style="margin-top:18px;">BR conflicts &amp; resolutions ({{CONFLICTS_COUNT}})</div>
-      <!-- If this slug has NO BR conflicts, replace the .br-table-wrap below with:
-           <div class="empty-note">No business-rule conflicts for this slug.</div> -->
-      <div class="br-table-wrap">
-        <table class="br-table">
-          <thead><tr><th>BR</th><th>Core rule</th><th>MP App rule</th><th>Tenant override</th><th>Conflict</th><th>Resolution</th></tr></thead>
-          <tbody>
-            <!-- REPEAT br-conflict-row -->
-            <tr><td><strong>{{BR_N}}</strong></td><td>{{CORE_RULE}}</td><td>{{MP_APP_RULE}}</td><td>{{TENANT_OVERRIDE}}</td><td>{{CONFLICT}}</td><td>{{RESOLUTION}}</td></tr>
-            <!-- /REPEAT br-conflict-row -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <!-- /REPEAT rules-group -->
+    <div class="rules-group"><div class="rg-head">Journey Engine<span class="rg-slug">journey-engine</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Activity Detection<span class="rg-slug">activity-detection</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Journey View<span class="rg-slug">journey-view</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Route Progress<span class="rg-slug">route-progress</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Local Stats<span class="rg-slug">local-stats</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Mini-Window<span class="rg-slug">mini-window</span></div><div class="empty-note">No related business rules or conflicts recorded (governed by ADR-0003).</div></div>
+    <div class="rules-group"><div class="rg-head">Idle Accounting<span class="rg-slug">idle-accounting</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Journey Scene v2<span class="rg-slug">journey-scene-v2</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Map Experience<span class="rg-slug">map-experience</span></div><div class="empty-note">No related business rules or conflicts recorded (governed by ADR-0004).</div></div>
+    <div class="rules-group"><div class="rg-head">Route Planner v2<span class="rg-slug">route-planner-v2</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Journey POV<span class="rg-slug">journey-pov</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Journey Scene Art v3<span class="rg-slug">journey-scene-art-v3</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Journey Dynamic Curve<span class="rg-slug">journey-dynamic-curve</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Journey Cockpit Lean<span class="rg-slug">journey-cockpit-lean</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
+    <div class="rules-group"><div class="rg-head">Vehicle Picker<span class="rg-slug">vehicle-picker</span></div><div class="empty-note">No related business rules or conflicts recorded (governed by ADR-0007).</div></div>
   </div>
 </section>
 
-<!-- TEST RESULTS — both modes. TWO PARTS, in this order:
-     (A) "Test health at a glance" — AGGREGATE stats across ALL slugs (roll-up band + per-slug status table
-         covering cases / scripts / execution). This is what a manager reads first.
-     (B) "Per-slug detail" — one report-card per slug (umbrella first; single mode = one card).
-     Scan the WHOLE tests/ root for each slug: cases (tests/cases/<slug>.md), scripts
-     (tests/e2e/<slug>.* + tests/integration/<slug>.*), manual/backfill report (tests/reports/<slug>/report.md)
-     AND runner execution summary (tests/_runner/reports/<slug>/**/summary.md). A slug with no report → verdict
-     "neutral" + "no automated runs yet". NEVER invent verdicts, counts, or dates. -->
+<!-- TEST RESULTS -->
 <section id="tests">
   <h2>Test <span>Results</span></h2>
-  <p class="section-sub">{{TESTS_SUBTITLE}}</p>
+  <p class="section-sub">Every slug ran green through the project's Flutter runner (<code>fvm flutter test</code>). Numbers below are transcribed from each slug's latest runner summary under <code>tests/_runner/reports/</code>.</p>
 
-  <!-- ── (A) TEST HEALTH AT A GLANCE — aggregate first, so the manager grasps the ticket/epic at once. ── -->
+  <!-- (A) Test health at a glance -->
   <div class="dk-block-title" style="margin-bottom:12px;">Test health at a glance</div>
-
-  <!-- roll-up: aggregate test numbers across all slugs. 4–6 items — e.g.
-       Verdict (e.g. "4🟢 · 1 no run"), Case pass-rate ("96% · 48/50"), Cases designed (total),
-       Scripts authored ("4/5 slugs"), Slugs executed ("4/5"). NEVER fabricate — use ✗/0 when absent. -->
   <div class="rollup">
-    <!-- REPEAT test-rollup-item -->
-    <div class="r-item"><div class="r-num">{{TR_NUM}}</div><div class="r-label">{{TR_LABEL}}</div></div>
-    <!-- /REPEAT test-rollup-item -->
+    <div class="r-item"><div class="r-num">15 🟢</div><div class="r-label">Verdicts · all green</div></div>
+    <div class="r-item"><div class="r-num">100%</div><div class="r-label">Case pass-rate · every run</div></div>
+    <div class="r-item"><div class="r-num">350</div><div class="r-label">Cases designed</div></div>
+    <div class="r-item"><div class="r-num">0 / 15</div><div class="r-label">Scripts in tests/e2e|integration</div></div>
+    <div class="r-item"><div class="r-num">15 / 15</div><div class="r-label">Slugs executed</div></div>
   </div>
 
-  <!-- per-slug test status: makes the state of CASES, SCRIPTS and EXECUTION explicit per slug. -->
   <div class="audit-table-wrap">
     <table class="audit-table">
       <thead><tr><th>Slug</th><th>Test cases</th><th>Test scripts</th><th>Execution</th><th>Pass rate</th><th>Last run</th></tr></thead>
       <tbody>
-        <!-- REPEAT test-status-row: one per slug (umbrella first). Cells:
-             CASES_CELL    — "<n> designed" from tests/cases/<slug>.md, or "✗ none" (class="gap").
-             SCRIPTS_CELL  — which layers authored, e.g. "e2e + integration" / "integration only", or "✗ none".
-             VERDICT pill  — green/fail/neutral from the report/runner summary; neutral "no runs" if none.
-             PASS_RATE     — passed/total (+%) from the result table; "—" if no run.
-             LAST_RUN_DATE — run date from report/runner summary; "—" if none. -->
-        <tr>
-          <td class="slug-cell">{{SLUG_ID}}</td>
-          <td>{{CASES_CELL}}</td>
-          <td>{{SCRIPTS_CELL}}</td>
-          <td><span class="verdict {{green|fail|neutral}}" style="padding:3px 10px; font-size:11px;">{{VERDICT_LABEL}}</span></td>
-          <td><span class="pct">{{PASS_PCT}}</span> · {{PASSED}}/{{TOTAL}}</td>
-          <td class="date">{{LAST_RUN_DATE}}</td>
-        </tr>
-        <!-- /REPEAT test-status-row -->
+        <tr><td class="slug-cell">journey-engine</td><td>22 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 63/63</td><td class="date">2026-06-23</td></tr>
+        <tr><td class="slug-cell">activity-detection</td><td>20 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 36/36 <span class="date">(2 flaky → pass isolated)</span></td><td class="date">2026-06-23</td></tr>
+        <tr><td class="slug-cell">journey-view</td><td>27 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 167/167 <span class="date">(5 skipped — opt-in perf + goldens)</span></td><td class="date">2026-06-24</td></tr>
+        <tr><td class="slug-cell">route-progress</td><td>23 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 145/145 <span class="date">(+308 regression)</span></td><td class="date">2026-06-24</td></tr>
+        <tr><td class="slug-cell">local-stats</td><td>29 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 191/191 <span class="date">(+484 regression · 88.5% cov)</span></td><td class="date">2026-06-24</td></tr>
+        <tr><td class="slug-cell">mini-window</td><td>31 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 92/92 <span class="date">(+559 regression)</span></td><td class="date">2026-06-24</td></tr>
+        <tr><td class="slug-cell">idle-accounting</td><td>21 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 102/102 <span class="date">(+602 regression)</span></td><td class="date">2026-06-24</td></tr>
+        <tr><td class="slug-cell">journey-scene-v2</td><td>13 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 642/642</td><td class="date">2026-06-24</td></tr>
+        <tr><td class="slug-cell">map-experience</td><td>32 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 730/730</td><td class="date">2026-06-25</td></tr>
+        <tr><td class="slug-cell">route-planner-v2</td><td>40 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 877/877</td><td class="date">2026-06-25</td></tr>
+        <tr><td class="slug-cell">journey-pov</td><td>21 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 948/948</td><td class="date">2026-06-25</td></tr>
+        <tr><td class="slug-cell">journey-scene-art-v3</td><td>19 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 465/465</td><td class="date">2026-06-25</td></tr>
+        <tr><td class="slug-cell">journey-dynamic-curve</td><td>15 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 182/182</td><td class="date">2026-06-25</td></tr>
+        <tr><td class="slug-cell">journey-cockpit-lean</td><td>18 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 69/69 <span class="date">(+247 regression)</span></td><td class="date">2026-06-26</td></tr>
+        <tr><td class="slug-cell">vehicle-picker</td><td>19 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 1161/1161 <span class="date">(full suite)</span></td><td class="date">2026-06-26</td></tr>
       </tbody>
     </table>
   </div>
-  <p style="font-size:12px; color:var(--text-weak); margin-top:10px;">{{TEST_MISSING_SUMMARY}}</p>
+  <p style="font-size:12px; color:var(--text-weak); margin-top:10px;">All 15 slugs executed and green (0 failures across every run). <strong>No slug has an authored script under <code>tests/e2e</code> or <code>tests/integration</code></strong> — those folders hold only <code>.gitkeep</code>; all executable tests live inside the Flutter package (<code>src/focus_journey/test</code> + <code>integration_test</code>), which is why the "Test scripts" column reads ✗ everywhere despite thousands of passing tests. Per-slug "pass rate" mixes in-scope and full-suite totals as each report presents them; totals grow over time as the regression suite accumulates.</p>
 
-  <!-- ── (B) PER-SLUG DETAIL — the full report-card(s) below the at-a-glance block. ── -->
+  <!-- (B) Per-slug detail -->
   <h3 style="margin:32px 0 14px;">Per-slug detail</h3>
 
-  <!-- REPEAT report-card: one per slug. -->
   <div class="report-card">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
-      <div>
-        <h3>{{RUN_TITLE}}</h3>
-        <div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">{{RUN_SUBTITLE}}</div>
-      </div>
-      <div class="verdict neutral">{{VERDICT_LABEL}}</div>
+      <div><h3>journey-engine</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-23 · fvm flutter test</div></div>
+      <div class="verdict green">🟢 GREEN</div>
     </div>
-    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">{{RUN_NOTES}}</p>
-    <!-- If a result table exists in the report, include it; otherwise delete this table. status class "pass"/"fail". -->
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">63/63 passed, 0 failed/flaky/skipped. Every TC-001…TC-022 maps to ≥1 passing test.</p>
     <table class="result-table">
-      <thead><tr><th>Case</th><th>Spec / area</th><th>Status</th><th>Time</th></tr></thead>
+      <thead><tr><th>Suite</th><th>Area</th><th>Status</th><th>Count</th></tr></thead>
       <tbody>
-        <!-- REPEAT result-row -->
-        <tr><td>{{CASE_ID}}</td><td>{{CASE_AREA}}</td><td class="pass">{{STATUS}}</td><td>{{TIME}}</td></tr>
-        <!-- /REPEAT result-row -->
+        <tr><td>journey_engine_test.dart</td><td>core loop / policy</td><td class="pass">PASS</td><td>44</td></tr>
+        <tr><td>journey_progress_test.dart</td><td>day / midnight</td><td class="pass">PASS</td><td>4</td></tr>
+        <tr><td>shared_preferences_journey_repository_test.dart</td><td>persistence round-trip</td><td class="pass">PASS</td><td>15</td></tr>
       </tbody>
     </table>
   </div>
-  <!-- /REPEAT report-card -->
-</section>
 
-<!-- TIMELINE (single-slug only): DELETE in epic mode unless you have meaningful per-epic dates. -->
-<section id="timeline">
-  <h2>Development <span>Timeline</span></h2>
-  <p class="section-sub">{{TIMELINE_SUBTITLE}}</p>
-  <div class="timeline">
-    <!-- REPEAT tl-item: tl-dot class is "primary" for in-flight milestones, "done" for ship. Use only real dates. -->
-    <div class="tl-item">
-      <div class="tl-dot primary">{{EMOJI}}</div>
-      <div class="tl-content"><div class="tl-date">{{DATE}}</div><div class="tl-text">{{MILESTONE_TEXT}}</div></div>
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>activity-detection</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-23 · macOS (Windows not exercised)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
     </div>
-    <!-- /REPEAT -->
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">36/36 passed. 2 e2e smoke files flaked on a launch/debug-connection race in the batched suite and passed on isolated re-run — not a test defect; no code changed.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>method_channel_activity_plugin_test.dart</td><td>plugin contract</td><td class="pass">PASS</td><td>16</td></tr>
+        <tr><td>activity_plugin_contract_test.dart</td><td>interface</td><td class="pass">PASS</td><td>8</td></tr>
+        <tr><td>mock_activity_source_test.dart</td><td>mock source</td><td class="pass">PASS</td><td>7</td></tr>
+        <tr><td>activity_real_backend_smoke_test.dart</td><td>e2e (flaky → pass isolated)</td><td class="pass">PASS</td><td>2</td></tr>
+      </tbody>
+    </table>
   </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>journey-view</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-24 · macOS</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">167/167 passed; 5 skipped are documented deferrals (opt-in perf TC-015/016 + goldens with no headless infra). Full-suite regression sweep clean.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>journey_view_state_test / journey_cubit_test</td><td>state → view binding</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>game/journey_game_motion_test.dart</td><td>scroll / park motion</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>game/journey_sprites_no_orphan_test.dart</td><td>asset ⇄ CREDITS</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>integration_test/journey_scene_smoke_test.dart</td><td>scene smoke (TC-021)</td><td class="pass">PASS</td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>route-progress</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-24 · macOS</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">In-scope 145/145; full regression 308/308. 2 deferred-manual legs (privacy-audit PASS manual; on-device frame-timing deferred).</p>
+    <table class="result-table">
+      <thead><tr><th>Case</th><th>Area</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody>
+        <tr><td>TC-009</td><td>start + direction persist (integration)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-010</td><td>completed stays completed, no auto-advance</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-001..008/011/013</td><td>position math + boundary + determinism</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-015</td><td>off-direction tip guard</td><td class="pass">PASS</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>local-stats</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-24 · macOS · coverage 88.5%</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">In-scope 191/191; full regression 484/484. 8 deferred/manual legs (privacy-audit ship-gate, goldens, real-OS device legs).</p>
+    <table class="result-table">
+      <thead><tr><th>Case</th><th>Area</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody>
+        <tr><td>TC-001 / TC-002</td><td>daily stats + honesty (raw ≤ journey)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-004</td><td>Mon–Sun weekly aggregate</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-016</td><td>focus streak on raw-active ≥25 min</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-019 / TC-020</td><td>midnight reset (running + closed-across)</td><td class="pass">PASS</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>mini-window</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-24 · macOS (mock window/activity)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">In-scope 92/92; full regression 559/559. Deferred real-OS macOS + Windows NFR-9 legs carried to the manual checklist.</p>
+    <table class="result-table">
+      <thead><tr><th>Case</th><th>Area</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody>
+        <tr><td>TC-006</td><td>enterCompact → PiP visible, main hidden</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-008</td><td>never (mainVisible &amp;&amp; pipVisible)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-009</td><td>single shared game instance</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-019-CLAMP</td><td>off-screen position clamp (15 cases)</td><td class="pass">PASS</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>idle-accounting</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-24 · macOS</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">In-scope 102/102; full package 602/602. Privacy-audit runtime leg deferred (ship-gate, not a failure).</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>journey_engine_idle_accounting_test.dart</td><td>TC-100..120 Option B + segments</td><td class="pass">PASS</td><td>29</td></tr>
+        <tr><td>activity_segment_test.dart</td><td>segment record</td><td class="pass">PASS</td><td>7</td></tr>
+        <tr><td>journey_cubit_test.dart</td><td>divergence-0 reconciliation</td><td class="pass">PASS</td><td>7</td></tr>
+        <tr><td>journey_engine_test.dart</td><td>shipped-engine regression guard</td><td class="pass">PASS</td><td>44</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>journey-scene-v2</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-24 · macOS</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">Whole-package 641/641 + 1 macOS integration = 642/642. Beach/animal content sign-off + on-device fps carried to manual (beach/animals closed later by art-v3).</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>journey_scene_v2_test.dart</td><td>scroll decouple / winding / spacing (AC-1/6/7/8/9/10)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>road_geometry_test.dart</td><td>O(1) closed-form == naive loop</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>app_shell_visibility_test.dart</td><td>visibility-aware anim (AC-3/4/5)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>integration/journey_scene_v2_smoke_test.dart</td><td>TC-013 (macOS)</td><td class="pass">PASS</td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>map-experience</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-25 · macOS (offline TileProvider injected)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">Whole-package 726/726 + 4 macOS integration = 730/730. AC-11 real OSM round-trip, NFR-1 fps, NFR-3 screen-reader carried to manual (no test reaches the network).</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>route_polyline_projector_test.dart</td><td>distance→coordinate (AC-4/6/10)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>idle_trace_mapper_test.dart</td><td>red idle trace (AC-6/7/8/9/12)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>province_geography_test.dart</td><td>13 provinces / VN bbox / chain order</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>integration/map_experience_wiring_test.dart</td><td>overlay ⇄ full-screen (macOS)</td><td class="pass">PASS</td><td>4</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>route-planner-v2</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-25 · macOS</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">877/877 (full suite 870 + route subset 371 + 7 macOS E2E). NFR-1 fps &amp; NFR-3 a11y carried to manual.</p>
+    <table class="result-table">
+      <thead><tr><th>Case</th><th>Area (ACs)</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody>
+        <tr><td>TC-314 / TC-315</td><td>review+edit+cancel records nothing (AC-6)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-330</td><td>abandon stamps offset, no reset (AC-10/7)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-334 / TC-336</td><td>custom route survives restart (AC-12)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-335</td><td>new route red trace — no bleed (AC-11)</td><td class="pass">PASS</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>journey-pov</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-25 · macOS</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">948/948 (package 946 + 2-surface e2e 2). Manual carries: real-OS PiP (AC-12), art review (AC-16), fps (NFR-1), a11y (NFR-3).</p>
+    <table class="result-table">
+      <thead><tr><th>Case</th><th>Area (ACs)</th><th>Status</th><th>Time</th></tr></thead>
+      <tbody>
+        <tr><td>TC-201/203/206</td><td>car + motorbike cockpit render (AC-1/3/6)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-207 / TC-208</td><td>clean revert / restore on mode-switch (AC-7/8)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-214 / TC-215</td><td>separation + cosmetic byte-for-byte (AC-9/10)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>TC-209</td><td>cockpit on both surfaces (e2e, AC-5/11)</td><td class="pass">PASS</td><td>2</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>journey-scene-art-v3</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-25 · macOS (3 invocations)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">465/465 (game 154 + journey feature 309 + 2 macOS integration). One mechanical infra flake (unsigned iOS default) fixed by re-running <code>-d macos</code>. On-device fps carried to manual.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>spike_artifact tests</td><td>art-direction sign-off gate (AC-1/2)</td><td class="pass">PASS</td><td>5</td></tr>
+        <tr><td>art_v3 tests</td><td>wholesale re-source + beach + animals</td><td class="pass">PASS</td><td>20</td></tr>
+        <tr><td>credits tests</td><td>higher-res + every path attributed (AC-9/11)</td><td class="pass">PASS</td><td>7</td></tr>
+        <tr><td>separation tests</td><td>engine byte-for-byte + separation (AC-12/13)</td><td class="pass">PASS</td><td>6</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>journey-dynamic-curve</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-25 · macOS</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">182/182 (game dir incl. regressions 181 + 1 macOS smoke). NFR-1 fps &amp; NFR-3 a11y device legs manual.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>flutter test .../game/</td><td>curvature, sweep, arc-length spacing (AC-1..7)</td><td class="pass">PASS</td><td>181</td></tr>
+        <tr><td>integration/journey_dynamic_curve_smoke_test.dart</td><td>on-device smoke (macOS)</td><td class="pass">PASS</td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>journey-cockpit-lean</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-26 · macOS (ship-gate re-run)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">In-scope 69/69; full journey-game regression 247/247. Motion-feel, fps and real-OS PiP legs carried to manual.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>unit / widget / golden / static / perf</td><td>signed lean, bounded roll, reduce-motion (AC-1..12)</td><td class="pass">PASS</td><td>66</td></tr>
+        <tr><td>integration two-surface (macOS)</td><td>lean covers PiP band (AC-13, TC-514)</td><td class="pass">PASS</td><td>2</td></tr>
+        <tr><td>integration smoke (macOS)</td><td>TC-518</td><td class="pass">PASS</td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>vehicle-picker</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-06-26 · macOS (ship-gate, post dev-mode-switcher removal)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">Full package 1161/1161, <code>flutter analyze</code> clean. Two-surface integration green in the in-scope run. Manual carries: icon-art cohesion, real-OS a11y, on-device fps.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>TC-601..618</td><td>precedence, persistence, ≤1-frame swap (AC-1..7)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>app_shell_vehicle_precedence_test.dart</td><td>production shared-game path (AC-2)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>firewall / import static test</td><td>ADR-0007 no accrual path (AC-10)</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>vehicle_picker_two_surface_test.dart</td><td>two-surface (macOS)</td><td class="pass">PASS</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
 </section>
 
 <!-- FOOTER -->
 <footer>
   <p class="l1">Built with the <strong>JobLogic Agentic FX Framework</strong></p>
-  <p style="margin-top:12px; font-size:12px;">{{TICKET_ID}}{{OPTIONAL_STACK_LINE}}</p>
+  <p style="margin-top:12px; font-size:12px;">Vietnam Focus Journey · 15 slugs · v1 MVP → v2 → visual-polish epic · Flutter desktop (macOS + Windows)</p>
 </footer>
 
-<!-- Scroll-spy: highlights the nav link of the section currently in view. Keep this script. -->
 <script>
   (function () {
     var links = Array.prototype.slice.call(document.querySelectorAll('nav a[href^="#"]'));

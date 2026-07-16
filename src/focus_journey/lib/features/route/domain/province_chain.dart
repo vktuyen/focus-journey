@@ -2,19 +2,31 @@
 ///
 /// The single source of truth for the Vietnam province chain geometry: an
 /// ordered list of checkpoints (south tip → north tip) plus the positive
-/// inter-checkpoint segment distances. This file owns `totalChainKm` (locked
-/// decision 2: route-progress owns the ~2000 km total; the engine takes
-/// `kmPerActiveHour` as injected config defaulting to `totalChainKm ÷ ~8h`).
+/// inter-checkpoint segment distances. This file owns `totalChainKm`; the engine
+/// takes `kmPerActiveHour` as injected config derived from `totalChainKm ÷ ~8h`.
+///
+/// ## province-chain-2026 (candidate ADR-0009): 34-unit great-circle spine
+/// The chain is rebuilt onto Vietnam's **34 current administrative units (2026)**
+/// from the single ordered source-of-record [kVietnamUnits2026]. Segment
+/// distances are AUTO-COMPUTED as the [greatCircleKm] (haversine) distance
+/// between consecutive administrative-centre coordinates — NOT hand-authored
+/// stylized km — so `totalChainKm` reflects real 2026 geography (≈3160 km).
+/// The order is a hand-curated coast-hugging south→north spine verified by the
+/// dense no-sea-crossing test (AC-5). This supersedes the old stylized 13-node /
+/// ~2000 km premise.
 library;
 
+import 'haversine.dart';
 import 'journey_direction.dart';
 import 'province.dart';
+import 'vietnam_units_2026.dart';
 
 /// An ordered chain of [Province] checkpoints with the inter-checkpoint
 /// distances between each adjacent pair.
 ///
 /// Invariants (enforced by the constructor — Chain-data integrity NFR / TC-NF4):
-/// - strictly ordered south tip → north tip (`Mũi Cà Mau` → `Hà Giang`);
+/// - ordered south tip → north tip (index 0 = the southernmost centre
+///   `Cà Mau`; last = the northernmost current unit, the max-latitude centre);
 /// - at least two nodes, no duplicate ids;
 /// - exactly `nodes.length - 1` segments, **every one strictly positive**;
 /// - the sum of segment distances equals [totalChainKm] (within [_sumTolerance]).
@@ -69,23 +81,26 @@ class ProvinceChain {
   /// Float tolerance for the segment-sum invariant (km).
   static const double _sumTolerance = 1e-6;
 
-  /// The checkpoints in canonical order: index 0 = south tip (`Mũi Cà Mau`),
-  /// last index = north tip (`Hà Giang`).
+  /// The checkpoints in canonical order: index 0 = south tip (`Cà Mau`), last
+  /// index = north tip (the northernmost current unit — the max-latitude centre).
   final List<Province> nodes;
 
   /// `segmentsKm[i]` is the distance (km) from `nodes[i]` to `nodes[i + 1]`,
   /// in canonical south→north order. Length is `nodes.length - 1`.
   final List<double> segmentsKm;
 
-  /// The south tip (`Mũi Cà Mau`) — the destination when heading south.
+  /// The south tip (`Cà Mau`) — the destination when heading south.
   Province get southTip => nodes.first;
 
-  /// The north tip (`Hà Giang`) — the destination when heading north.
+  /// The north tip (the northernmost current unit, max-latitude centre) — the
+  /// destination when heading north. (Its identity changed under the 2026 units;
+  /// the `towardHaGiang` label is kept as a stable symbolic name — see
+  /// [JourneyDirection].)
   Province get northTip => nodes.last;
 
   /// Total chain length (km) — the sum of all segments. This is the source of
-  /// truth that, ÷ ~8 active hours, confirms the engine's `kmPerActiveHour`
-  /// (locked decision 2). Computed from [segmentsKm] so it can never drift.
+  /// truth that, ÷ ~8 active hours, gives the engine's `kmPerActiveHour`.
+  /// Computed from [segmentsKm] so it can never drift.
   double get totalChainKm => segmentsKm.fold<double>(0, (a, b) => a + b);
 
   /// The cumulative canonical distance (km) from the south tip to `nodes[index]`
@@ -177,46 +192,31 @@ class ProvinceChain {
   }
 }
 
-/// The production curated chain (locked decision 5: ~10–15 major checkpoints
-/// along the Mũi Cà Mau → Hà Giang spine).
+/// The production curated chain (province-chain-2026 / candidate ADR-0009): all
+/// **34 current administrative units (2026)** in a hand-curated coast-hugging
+/// south→north spine, built from the single ordered source-of-record
+/// [kVietnamUnits2026].
 ///
-/// `totalChainKm ≈ 2000` (locked decision 2): the summed segments below give
-/// exactly **2000 km**, which ÷ ~8 active hours = 250 km/active-hour — the
-/// engine's shipped `defaultKmPerActiveHour`, so no engine retune is needed.
-/// The literal segment distances are stylized flavour distances (NOT
-/// survey-accurate GIS), tunable for playtest without changing code shape.
-///
-/// Ordered strictly south tip → north tip. 13 checkpoints, 12 segments.
+/// `nodes` are the 34 [Province]s in that order (index 0 = Cà Mau, the
+/// southernmost centre; last = Cao Bằng, the northernmost / max-latitude unit).
+/// `segmentsKm` are the **33** great-circle ([greatCircleKm]) distances between
+/// consecutive administrative-centre coordinates, so `totalChainKm` (≈3160 km)
+/// reflects real 2026 geography rather than a stylized total. The order never
+/// crosses open sea on the shipped 34-province base map — verified by the dense
+/// no-sea-crossing test (AC-5); fix any regression by RE-ORDERING the units in
+/// [kVietnamUnits2026], never by adding a non-unit waypoint.
 final ProvinceChain vietnamProvinceChain = ProvinceChain(
-  nodes: const <Province>[
-    Province(id: 'mui_ca_mau', name: 'Mũi Cà Mau'),
-    Province(id: 'can_tho', name: 'Cần Thơ'),
-    Province(id: 'ho_chi_minh', name: 'TP. Hồ Chí Minh'),
-    Province(id: 'da_lat', name: 'Đà Lạt'),
-    Province(id: 'nha_trang', name: 'Nha Trang'),
-    Province(id: 'quy_nhon', name: 'Quy Nhơn'),
-    Province(id: 'da_nang', name: 'Đà Nẵng'),
-    Province(id: 'hue', name: 'Huế'),
-    Province(id: 'vinh', name: 'Vinh'),
-    Province(id: 'ninh_binh', name: 'Ninh Bình'),
-    Province(id: 'ha_noi', name: 'Hà Nội'),
-    Province(id: 'sa_pa', name: 'Sa Pa'),
-    Province(id: 'ha_giang', name: 'Hà Giang'),
-  ],
-  // 12 segments summing to exactly 2000 km
-  // (130+170+250+120+170+230+90+290+200+80+150+120 = 2000).
-  segmentsKm: const <double>[
-    130, // Mũi Cà Mau → Cần Thơ
-    170, // Cần Thơ → TP. Hồ Chí Minh
-    250, // TP. Hồ Chí Minh → Đà Lạt
-    120, // Đà Lạt → Nha Trang
-    170, // Nha Trang → Quy Nhơn
-    230, // Quy Nhơn → Đà Nẵng
-    90, // Đà Nẵng → Huế
-    290, // Huế → Vinh (longest leg of the central spine)
-    200, // Vinh → Ninh Bình
-    80, // Ninh Bình → Hà Nội
-    150, // Hà Nội → Sa Pa
-    120, // Sa Pa → Hà Giang
-  ],
+  nodes: List<Province>.unmodifiable(<Province>[
+    for (final unit in kVietnamUnits2026)
+      Province(id: unit.id, name: unit.name),
+  ]),
+  segmentsKm: List<double>.unmodifiable(<double>[
+    for (var i = 0; i < kVietnamUnits2026.length - 1; i++)
+      greatCircleKm(
+        kVietnamUnits2026[i].lat,
+        kVietnamUnits2026[i].lon,
+        kVietnamUnits2026[i + 1].lat,
+        kVietnamUnits2026[i + 1].lon,
+      ),
+  ]),
 );

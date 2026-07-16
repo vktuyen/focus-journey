@@ -28,7 +28,10 @@ import '../../journey/domain/activity_segment.dart';
 import '../../journey/domain/journey_progress.dart';
 import '../domain/geo_polyline.dart';
 import '../domain/idle_trace_mapper.dart';
+import '../domain/province.dart';
 import '../domain/province_geography.dart';
+import '../domain/road_route.dart';
+import '../domain/route_curve.dart';
 import '../domain/route_polyline_projector.dart';
 import '../domain/route_position.dart';
 import '../domain/route_selection.dart';
@@ -59,6 +62,31 @@ class MapCubit extends Cubit<MapViewState> {
   List<ActivitySegment> _segments = const <ActivitySegment>[];
   RoutePolylineProjector? _projector;
 
+  /// The active plan's user-marked stops (route-real-road / AC-4), forwarded from
+  /// the route view state. Unioned with the endpoints to form the emphasized set.
+  List<String> _markedStopIds = const <String>[];
+
+  /// The route drawn along the REAL BUNDLED ROAD (route-real-road / AC-2),
+  /// forwarded from the route view state. When present it is the authoritative
+  /// drawn geometry (bypassing the chain projector/spline) AND the geometry the
+  /// current-position marker + red idle trace ride. `null` on the legacy/no-road
+  /// path (the map then falls back to the chain projector).
+  RoadRoute? _roadRoute;
+
+  /// The ordered waypoint provinces (start, stops…, end) aligned with
+  /// `_roadRoute.waypointCoordinates` — the ONLY markers drawn (AC-3).
+  List<Province> _waypoints = const <Province>[];
+
+  /// The smoothed (curved) road for the current route, computed ONCE per route
+  /// alongside [_projector] and reused across ticks (NFR-1 — never re-splined per
+  /// frame). Reset to `null` whenever the projector is rebuilt (route identity
+  /// change), then lazily recomputed in [_recompute].
+  GeoPolyline? _smoothedRoad;
+
+  /// The emphasized node-id set for the current route, computed ONCE per route
+  /// alongside [_projector]: { start id, end id } ∪ marked-stop ids (AC-2/AC-3).
+  Set<String>? _emphasizedNodeIds;
+
   /// route-planner-v2 (ADR-0005): the active route's DERIVED sub-chain geography,
   /// supplied by the route view state. The projector runs over THIS so the
   /// polyline + red trace draw the authored sub-path (AC-7), not the full spine.
@@ -87,13 +115,24 @@ class MapCubit extends Cubit<MapViewState> {
     if (newSelection?.start != _selection?.start ||
         newSelection?.direction != _selection?.direction ||
         newSelection?.routeStartOffsetKm != _selection?.routeStartOffsetKm ||
-        !identical(newGeography, _routeGeography)) {
+        !identical(newGeography, _routeGeography) ||
+        !_sameIds(route.markedStopIds, _markedStopIds)) {
+      // Route identity changed → drop the cached projector AND its derived
+      // per-route geometry (smoothed road + emphasized ids) so they recompute
+      // once; a mere distance tick keeps them (NFR-1 / TC-229).
       _projector = null;
+      _smoothedRoad = null;
+      _emphasizedNodeIds = null;
     }
     _selection = newSelection;
     _routeGeography = newGeography;
     _position = route.position;
     _countryPercent = route.countryPercent;
+    _markedStopIds = route.markedStopIds;
+    // route-real-road: the drawn road sub-path + its ordered waypoints, built once
+    // per route by the route cubit (NFR-1). When present, the map draws THIS.
+    _roadRoute = route.roadRoute;
+    _waypoints = route.waypoints;
     _recompute();
   }
 
@@ -107,6 +146,39 @@ class MapCubit extends Cubit<MapViewState> {
       return;
     }
 
+    // route-real-road (AC-2/AC-3): when a road route is present, the map follows
+    // the REAL ROAD — the drawn line is the bundled highway sub-path, the marker
+    // rides that road by the resolved (road) progress fraction, and the red idle
+    // trace maps onto the road. Markers are ONLY the waypoints (start/end/stops);
+    // there are NO per-province dots.
+    final roadRoute = _roadRoute;
+    if (roadRoute != null && !roadRoute.isEmpty) {
+      final marker = roadRoute.coordinateAtFraction(position.fractionAlongRoute);
+      final idleStretches = IdleTraceMapper.resolve(
+        segments: _segments,
+        routeStartOffsetKm: selection.routeStartOffsetKm,
+        projector: roadRoute,
+      );
+      emit(
+        MapViewState(
+          selection: selection,
+          position: position,
+          countryPercent: _countryPercent,
+          baseRoutePolyline: roadRoute.polyline,
+          smoothedRoutePolyline: roadRoute.polyline,
+          orderedNodes: _waypoints,
+          emphasizedNodeIds: <String>{
+            for (final w in _waypoints) w.id,
+          },
+          roadRoute: roadRoute,
+          waypoints: _waypoints,
+          markerPosition: marker,
+          idleStretches: idleStretches,
+        ),
+      );
+      return;
+    }
+
     // Build (or reuse) the route projector over the active route geography (the
     // derived sub-chain for v2, else the full geography — AC-7). Cached so the
     // static base polyline is projected once per route, not per tick.
@@ -114,6 +186,20 @@ class MapCubit extends Cubit<MapViewState> {
       selection: selection,
       geography: _routeGeography ?? _geography,
     );
+
+    // Per-route geometry, computed ONCE and cached (invalidated on route change
+    // in updateFromRoute) so it is never re-derived per tick/frame (NFR-1):
+    //  - the smoothed curved road (route-real-road / AC-1), and
+    //  - the emphasized node ids { start, end } ∪ marked stops (AC-2/AC-3).
+    final smoothed = _smoothedRoad ??= GeoPolyline(
+      smoothCurve(projector.baseRoutePolyline),
+    );
+    final ordered = projector.orderedNodes;
+    final emphasized = _emphasizedNodeIds ??= <String>{
+      if (ordered.isNotEmpty) ordered.first.id,
+      if (ordered.isNotEmpty) ordered.last.id,
+      ..._markedStopIds,
+    };
 
     // The marker keys off the resolved `routeDistanceKm` (the SAME math
     // route-progress uses — AC-5/TC-211), never raw cumulative (TC-212).
@@ -135,10 +221,20 @@ class MapCubit extends Cubit<MapViewState> {
         position: position,
         countryPercent: _countryPercent,
         baseRoutePolyline: GeoPolyline(projector.baseRoutePolyline),
-        orderedNodes: projector.orderedNodes,
+        smoothedRoutePolyline: smoothed,
+        orderedNodes: ordered,
+        emphasizedNodeIds: emphasized,
         markerPosition: marker,
         idleStretches: idleStretches,
       ),
     );
+  }
+
+  /// Order-insensitive id-set equality (marked-stop lists are small).
+  static bool _sameIds(List<String> a, List<String> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    return a.toSet().containsAll(b) && b.toSet().containsAll(a);
   }
 }

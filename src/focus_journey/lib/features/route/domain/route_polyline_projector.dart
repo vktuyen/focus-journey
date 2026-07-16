@@ -4,10 +4,14 @@
 ///
 /// ## CANONICAL-KM-AXIS DECISION (map-experience Decision A — resolves the spec's
 /// open question / TC-210)
-/// The curated [ProvinceChain.segmentsKm] (the engine's locked 2000 km total)
-/// REMAINS the canonical distance axis. This projector does NOT re-derive
-/// distances from geodesic lat/long lengths — that would break AC-5 and the
-/// engine's `totalChainKm`. Instead, to project a `routeDistanceKm` (or a
+/// The [ProvinceChain.segmentsKm] (now the province-chain-2026 great-circle
+/// total, ≈3160 km over the 34 units — candidate ADR-0009 amends the old
+/// stylized ~2000 km premise) REMAINS the canonical distance axis. This
+/// projector does NOT re-derive distances from geodesic lat/long lengths — that
+/// would break AC-5 and the engine's `totalChainKm`. Because the segments are
+/// now themselves great-circle distances between the two checkpoint centres, the
+/// on-map leg length and the leg's km share now agree far more closely than
+/// under the old stylized km. Instead, to project a `routeDistanceKm` (or a
 /// segment's from/to km) onto map geometry it:
 ///   1. locates which chain leg the cumulative-from-origin distance falls in,
 ///   2. computes `fraction = kmIntoLeg / legKm`,
@@ -18,12 +22,11 @@
 /// between the two real cities. This satisfies AC-4 (the polyline traces the real
 /// country, because each checkpoint is at its real lat/long) AND AC-5 (the marker
 /// + red trace reuse the exact `routeDistanceKm` math) simultaneously. A
-/// consequence by design: the on-map visual length of a leg (the geodesic gap
-/// between its cities) intentionally DIFFERS from that leg's km proportion — a leg
-/// that is short in km but far apart on the map still consumes only its km share
-/// of the distance axis. This is deliberate (the chain km are stylised flavour
-/// distances, not GIS survey lengths) and is the contract the red-trace and the
-/// marker both key off, so they stay mutually consistent.
+/// consequence: any residual difference between a leg's on-map straight-line
+/// length and its km proportion is the contract the red-trace and the marker both
+/// key off, so they stay mutually consistent. Under province-chain-2026 the
+/// chain km ARE great-circle lengths between the leg's two centres, so this
+/// difference is now small (it was large under the old stylized flavour km).
 ///
 /// SEPARATION / PRIVACY INVARIANT (AC-12 / NFR-2 / TC-227/TC-230): this projector
 /// reads ONLY a given distance + the static [ProvinceGeography]/[ProvinceChain]
@@ -37,6 +40,7 @@ import 'journey_direction.dart';
 import 'province.dart';
 import 'province_chain.dart';
 import 'province_geography.dart';
+import 'route_geometry.dart';
 import 'route_selection.dart';
 
 /// Projects route distances onto the real-geography polyline for a single route
@@ -52,7 +56,7 @@ import 'route_selection.dart';
 /// - [stretchBetween] — the contiguous polyline sub-path between two
 ///   route-distance-km arc-lengths, following the road's vertices across any
 ///   checkpoint boundary it crosses (the red-trace stretch — AC-6/TC-201..208).
-class RoutePolylineProjector {
+class RoutePolylineProjector implements RouteGeometry {
   /// Builds a projector for [selection] over [geography]. Precomputes the
   /// route's ordered checkpoint coordinates + their cumulative-from-origin km
   /// (the canonical axis) once, so projection is allocation-light per call.
@@ -94,11 +98,13 @@ class RoutePolylineProjector {
   late final List<GeoCoordinate> _coordinates;
 
   /// The full route distance (km) — origin to destination tip.
+  @override
   double get routeLengthKm => _cumulativeKm.last;
 
   /// The base road for the current route: every checkpoint coordinate in travel
   /// order (origin → destination). The polyline the painter strokes (AC-4).
   /// Index 0 is the start pin; the last is the destination pin.
+  @override
   List<GeoCoordinate> get baseRoutePolyline =>
       List<GeoCoordinate>.unmodifiable(_coordinates);
 
@@ -112,6 +118,7 @@ class RoutePolylineProjector {
   /// Clamps to `[0, routeLengthKm]` so `routeDistanceKm <= 0` resolves to the
   /// start pin (TC-205) and `routeDistanceKm >= routeLengthKm` resolves to the
   /// destination pin (TC-206) — no overshoot, no underflow.
+  @override
   GeoCoordinate coordinateAt(double routeDistanceKm) {
     final clamped = _clampToRoute(routeDistanceKm);
     if (clamped <= 0 || _coordinates.length == 1) {
@@ -141,6 +148,7 @@ class RoutePolylineProjector {
   ///
   /// Both ends are clamped to `[0, routeLengthKm]` (TC-205/TC-206). A zero-length
   /// or out-of-route span yields an empty polyline (no red drawn).
+  @override
   GeoPolyline stretchBetween(double fromKm, double toKm) {
     final lo = _clampToRoute(fromKm < toKm ? fromKm : toKm);
     final hi = _clampToRoute(fromKm < toKm ? toKm : fromKm);

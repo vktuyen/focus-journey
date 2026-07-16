@@ -31,7 +31,18 @@ abstract interface class RouteRepository {
   /// stored blob is a LEGACY `RouteSelection` (an in-flight v1 route written by
   /// the shipped build), it is **migrated forward** to a [RoutePlan] rather than
   /// discarded (ADR-0005 decision 4 migration rule / AC-12).
-  Future<RoutePlan?> loadPlan();
+  ///
+  /// **province-chain-2026 migration-by-reset (AC-9).** When a persisted plan or
+  /// legacy selection references RETIRED pre-2025 province ids that no longer
+  /// resolve against the current 34-unit chain, it is forward-migrated **by
+  /// reset**: a fresh full-spine active plan (all 34 units, south→north) stamped
+  /// at [currentCumulativeKm] — the engine's current cumulative distance (BR-8's
+  /// separate never-reset store, read by the caller and threaded in). This is a
+  /// reset, NOT an id-remap: the topology + total km changed wholesale, so the
+  /// traveller is re-based onto the new spine at the same lifetime distance
+  /// rather than dropped at an arbitrary remapped unit. A genuinely
+  /// corrupt/undecodable blob still degrades to `null` (no crash).
+  Future<RoutePlan?> loadPlan({double currentCumulativeKm = 0});
 
   /// Persists [plan], overwriting any previous route (selection or plan). The
   /// single seam for the v2 authored-route lifecycle (AC-12).

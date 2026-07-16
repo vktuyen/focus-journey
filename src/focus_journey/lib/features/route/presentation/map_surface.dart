@@ -18,14 +18,16 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_map/flutter_map.dart';
 
 import '../../journey/domain/travel_mode.dart';
+import '../../journey/presentation/journey_gate_cubit.dart';
 import '../../stats/domain/app_settings.dart';
 import '../../stats/presentation/settings_cubit.dart';
 import '../../stats/presentation/vehicle_picker.dart';
+import '../domain/base_map_geometry.dart';
 import '../domain/province_chain.dart';
 import '../domain/province_geography.dart';
+import '../domain/road_path.dart';
 import '../domain/route_planner.dart';
 import '../domain/route_position.dart';
 import 'map_cubit.dart';
@@ -38,12 +40,13 @@ import 'route_progress_cubit.dart';
 /// full-screen map in the same window (AC-2).
 class InlineMapOverlay extends StatelessWidget {
   /// Creates the inline overlay over the injected [chain] / [geography] (picker
-  /// geometry + auto-insert). [tileProvider] is forwarded to [MapView] for the
-  /// test seam.
+  /// geometry + auto-insert). [baseMap] is the bundled Vietnam base geometry
+  /// forwarded to [MapView] (AC-1/AC-2).
   const InlineMapOverlay({
     required this.chain,
     required this.geography,
-    this.tileProvider,
+    this.baseMap,
+    this.road,
     super.key,
   });
 
@@ -53,8 +56,13 @@ class InlineMapOverlay extends StatelessWidget {
   /// The static geography — drives the pure auto-insert (NFR-2).
   final ProvinceGeography geography;
 
-  /// Optional tile-provider override (test seam).
-  final TileProvider? tileProvider;
+  /// The bundled base-map geometry drawn beneath the overlays (AC-1/AC-2).
+  final BaseMapGeometry? baseMap;
+
+  /// The bundled national road (route-real-road), threaded to the planner flow's
+  /// review step so its distance readout reflects the REAL road length. `null`
+  /// (tests / degraded mode) falls back to the sub-chain km.
+  final RoadPath? road;
 
   @override
   Widget build(BuildContext context) {
@@ -68,22 +76,23 @@ class InlineMapOverlay extends StatelessWidget {
           return _InlinePlannerCard(
             chain: chain,
             geography: geography,
+            road: road,
             onConfirmed: (resolved) =>
                 context.read<RouteProgressCubit>().confirmRoute(resolved),
           );
         }
         // A compact, MOBA-style minimap floating as a HUD card. The whole card
         // is one tap target that opens the full-screen map (AC-2). It renders
-        // the route glanceably WITHOUT live OSM tiles (showTiles: false) — the
-        // base road, checkpoint pins, current-position marker, and the red idle
-        // trace (AC-6/AC-7/AC-9) over a flat background. No tiles ⇒ no tile
-        // network calls from the minimap (strictly fewer GETs — NFR-2).
+        // the bundled offline Vietnam base (decimated for the small size — NFR-1)
+        // with the base road, checkpoint pins, current-position marker, and the
+        // red idle trace on top (AC-2/AC-8). No network of any kind (AC-10).
         return _MinimapCard(
           onTap: () => openFullScreenMap(
             context,
             chain: chain,
             geography: geography,
-            tileProvider: tileProvider,
+            baseMap: baseMap,
+            road: road,
           ),
           child: Stack(
             fit: StackFit.expand,
@@ -91,11 +100,7 @@ class InlineMapOverlay extends StatelessWidget {
               // Absorb map gestures so the minimap is a single tap target
               // (the full-screen surface is interactive instead).
               IgnorePointer(
-                child: MapView(
-                  state: state,
-                  tileProvider: tileProvider,
-                  showTiles: false,
-                ),
+                child: MapView(state: state, baseMap: baseMap, compact: true),
               ),
               const _ExpandHint(),
             ],
@@ -114,7 +119,8 @@ Future<void> openFullScreenMap(
   BuildContext context, {
   required ProvinceChain chain,
   required ProvinceGeography geography,
-  TileProvider? tileProvider,
+  BaseMapGeometry? baseMap,
+  RoadPath? road,
 }) {
   final mapCubit = context.read<MapCubit>();
   final routeCubit = context.read<RouteProgressCubit>();
@@ -130,6 +136,16 @@ Future<void> openFullScreenMap(
   } on ProviderNotFoundException {
     settingsCubit = null;
   }
+  // route-real-road: re-provide the SAME journey gate into the pushed subtree so
+  // the full-screen re-authoring (new-route / abandon) flow can pause the active
+  // route during setup and resume it on close. Defensive — a route-only host
+  // (map widget tests) has none, and the pause/resume then simply no-ops.
+  JourneyGateCubit? gateCubit;
+  try {
+    gateCubit = context.read<JourneyGateCubit>();
+  } on ProviderNotFoundException {
+    gateCubit = null;
+  }
   return Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       builder: (_) => MultiBlocProvider(
@@ -138,11 +154,14 @@ Future<void> openFullScreenMap(
           BlocProvider<RouteProgressCubit>.value(value: routeCubit),
           if (settingsCubit != null)
             BlocProvider<SettingsCubit>.value(value: settingsCubit),
+          if (gateCubit != null)
+            BlocProvider<JourneyGateCubit>.value(value: gateCubit),
         ],
         child: FullScreenMap(
           chain: chain,
           geography: geography,
-          tileProvider: tileProvider,
+          baseMap: baseMap,
+          road: road,
         ),
       ),
     ),
@@ -157,7 +176,8 @@ class FullScreenMap extends StatelessWidget {
   const FullScreenMap({
     required this.chain,
     required this.geography,
-    this.tileProvider,
+    this.baseMap,
+    this.road,
     super.key,
   });
 
@@ -167,8 +187,12 @@ class FullScreenMap extends StatelessWidget {
   /// The static geography — drives the pure auto-insert (NFR-2).
   final ProvinceGeography geography;
 
-  /// Optional tile-provider override (test seam).
-  final TileProvider? tileProvider;
+  /// The bundled base-map geometry drawn beneath the overlays (AC-1).
+  final BaseMapGeometry? baseMap;
+
+  /// The bundled national road (route-real-road), threaded to the planner flow's
+  /// review step. `null` (tests / degraded mode) falls back to the sub-chain km.
+  final RoadPath? road;
 
   @override
   Widget build(BuildContext context) {
@@ -200,6 +224,7 @@ class FullScreenMap extends StatelessWidget {
                       child: RoutePlannerFlow(
                         chain: chain,
                         geography: geography,
+                        road: road,
                         onConfirmed: (resolved) => context
                             .read<RouteProgressCubit>()
                             .confirmRoute(resolved),
@@ -207,7 +232,9 @@ class FullScreenMap extends StatelessWidget {
                         // vehicle-picker AC-13: skippable, pre-seeded route-start
                         // vehicle control — present only when a SettingsCubit is
                         // mounted (else omitted, degrading gracefully).
-                        vehiclePicker: RouteStartVehiclePicker.maybeFor(context),
+                        vehiclePicker: RouteStartVehiclePicker.maybeFor(
+                          context,
+                        ),
                       ),
                     ),
                   );
@@ -215,7 +242,7 @@ class FullScreenMap extends StatelessWidget {
                 return Stack(
                   fit: StackFit.expand,
                   children: <Widget>[
-                    MapView(state: state, tileProvider: tileProvider),
+                    MapView(state: state, baseMap: baseMap),
                     // Top-left route readout (re-homed from the old Map tab —
                     // reads ONLY state.position + countryPercent; pure visualizer,
                     // AC-8/AC-12).
@@ -223,6 +250,7 @@ class FullScreenMap extends StatelessWidget {
                       _RouteReadout(
                         position: state.position!,
                         countryPercent: state.countryPercent,
+                        roadLengthKm: state.routeRoadLengthKm,
                       ),
                     // Bottom-left legend (symbol key + the AC-9 solid/dashed
                     // non-colour cue — doubles as the NFR-3 colour-blind aid).
@@ -238,6 +266,7 @@ class FullScreenMap extends StatelessWidget {
                       _CompletionCelebration(
                         position: state.position!,
                         countryPercent: state.countryPercent,
+                        roadLengthKm: state.routeRoadLengthKm,
                         // Completion is NOT an abandon (no progress-loss guard —
                         // the route already finished, AC-10).
                         onStartNew: () =>
@@ -267,6 +296,15 @@ class FullScreenMap extends StatelessWidget {
     required bool abandon,
   }) async {
     final cubit = context.read<RouteProgressCubit>();
+    // route-real-road: pause the active route while the user re-authors so it
+    // does not accrue during setup; resume on close (cancel keeps the old route,
+    // confirm starts the new one via onRouteStarted). Captured before the awaits.
+    JourneyGateCubit? gate;
+    try {
+      gate = context.read<JourneyGateCubit>();
+    } on ProviderNotFoundException {
+      gate = null;
+    }
     if (abandon) {
       final proceed = await confirmAbandon(
         context,
@@ -283,30 +321,40 @@ class FullScreenMap extends StatelessWidget {
     // not inherit the SettingsCubit provider, so re-provide the SAME cubit
     // instance into the dialog subtree (AC-11 single source — no second store).
     final settingsCubit = context.read<SettingsCubit>();
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => BlocProvider<SettingsCubit>.value(
-        value: settingsCubit,
-        child: Dialog(
-          child: SingleChildScrollView(
-            child: RoutePlannerFlow(
-              chain: chain,
-              geography: geography,
-              onConfirmed: (resolved) {
-                if (abandon) {
-                  cubit.abandonAndStartNew(resolved);
-                } else {
-                  cubit.confirmRoute(resolved);
-                }
-                Navigator.of(dialogContext).pop();
-              },
-              onCancelled: () => Navigator.of(dialogContext).pop(),
-              vehiclePicker: RouteStartVehiclePicker.maybeFor(dialogContext),
+    gate?.beginAuthoring();
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => BlocProvider<SettingsCubit>.value(
+          value: settingsCubit,
+          child: Dialog(
+            child: SingleChildScrollView(
+              child: RoutePlannerFlow(
+                chain: chain,
+                geography: geography,
+                road: road,
+                onConfirmed: (resolved) {
+                  if (abandon) {
+                    cubit.abandonAndStartNew(resolved);
+                  } else {
+                    cubit.confirmRoute(resolved);
+                  }
+                  Navigator.of(dialogContext).pop();
+                },
+                onCancelled: () => Navigator.of(dialogContext).pop(),
+                vehiclePicker: RouteStartVehiclePicker.maybeFor(dialogContext),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    } finally {
+      // Always resume the (still-active on cancel, or newly-confirmed) route,
+      // even if building/showing the authoring dialog threw — otherwise the gate
+      // would be stuck paused with no manual control to recover. Idempotent with
+      // the confirm's onRouteStarted, and a no-op if the gate was torn down.
+      gate?.endAuthoring();
+    }
   }
 }
 
@@ -409,7 +457,11 @@ class _CloseButton extends StatelessWidget {
 ///   3. `{percentOfCountry}% of Vietnam`.
 /// Each line is wrapped in [Semantics] for screen-reader recovery (NFR-3).
 class _RouteReadout extends StatelessWidget {
-  const _RouteReadout({required this.position, this.countryPercent});
+  const _RouteReadout({
+    required this.position,
+    this.countryPercent,
+    this.roadLengthKm,
+  });
 
   final RoutePosition position;
 
@@ -418,6 +470,12 @@ class _RouteReadout extends StatelessWidget {
   /// full-chain path (where `percentOfCountry` already IS the country %).
   final double? countryPercent;
 
+  /// route-real-road (#4): the DRAWN ROAD sub-path length (km). When present, the
+  /// "km to end" readout reflects the real road (remaining road km), so the
+  /// number matches what is drawn — not the chain-centre distance. `null` on the
+  /// legacy/no-road path (then the chain distance-to-destination is shown).
+  final double? roadLengthKm;
+
   @override
   Widget build(BuildContext context) {
     final next = position.next;
@@ -425,8 +483,10 @@ class _RouteReadout extends StatelessWidget {
     final line1 = next == null
         ? 'Arrived at $destinationName'
         : 'Next: ${next.name} in ${position.distanceToNextKm.round()} km';
-    final line2 =
-        '${position.distanceToDestinationKm.round()} km to $destinationName';
+    final roadRemainingKm = roadLengthKm == null
+        ? position.distanceToDestinationKm
+        : roadLengthKm! * (1 - position.fractionAlongRoute);
+    final line2 = '${roadRemainingKm.round()} km to $destinationName';
     // AC-8: show BOTH percentages — route % (resolver, over the sub-chain) and
     // country % (cubit, over the full chain). On the legacy path countryPercent
     // is null and percentOfCountry already IS the country %, so show just it.
@@ -501,8 +561,8 @@ class _RouteReadout extends StatelessWidget {
 /// and the idle trace, where RED SOLID = voluntary idle and RED DASHED =
 /// lock/sleep idle (AC-9's non-colour cue, restated in words). The pattern +
 /// the text convey the cause WITHOUT relying on colour alone — the NFR-3
-/// colour-blind aid. Anchored bottom-left so it clears the OSM attribution
-/// (bottom-right) and the close button (top-right).
+/// colour-blind aid. Anchored bottom-left so it clears the CC BY-SA base-map
+/// attribution (bottom-right) and the close button (top-right).
 class _MapLegend extends StatelessWidget {
   const _MapLegend();
 
@@ -760,10 +820,12 @@ class _InlinePlannerCard extends StatelessWidget {
     required this.chain,
     required this.geography,
     required this.onConfirmed,
+    this.road,
   });
 
   final ProvinceChain chain;
   final ProvinceGeography geography;
+  final RoadPath? road;
   final void Function(ResolvedRoute resolved) onConfirmed;
 
   @override
@@ -779,6 +841,7 @@ class _InlinePlannerCard extends StatelessWidget {
               child: RoutePlannerFlow(
                 chain: chain,
                 geography: geography,
+                road: road,
                 onConfirmed: onConfirmed,
                 // Inline (no route yet): cancelling the picker is inert — the
                 // planner re-shows the picker on its own back action; here the
@@ -846,6 +909,7 @@ class _CompletionCelebration extends StatelessWidget {
     required this.position,
     required this.onStartNew,
     this.countryPercent,
+    this.roadLengthKm,
   });
 
   final RoutePosition position;
@@ -854,10 +918,15 @@ class _CompletionCelebration extends StatelessWidget {
   /// route-planner-v2 (AC-8): the full-chain % shown alongside the route %.
   final double? countryPercent;
 
+  /// route-real-road (#4): the drawn road sub-path length (km) — the total shown
+  /// on arrival reflects the real road, not the chain-centre distance.
+  final double? roadLengthKm;
+
   @override
   Widget build(BuildContext context) {
     final crossed = position.passed.map((p) => p.name).join(' → ');
-    final total = position.distanceToDestinationKm.toStringAsFixed(0);
+    final total = (roadLengthKm ?? position.distanceToDestinationKm)
+        .toStringAsFixed(0);
     final percent = countryPercent == null
         ? '${position.percentOfCountry.toStringAsFixed(1)}% of Vietnam'
         : '${position.percentOfCountry.toStringAsFixed(1)}% of route · '

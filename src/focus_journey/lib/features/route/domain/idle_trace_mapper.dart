@@ -15,7 +15,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../journey/domain/activity_segment.dart';
 import 'geo_polyline.dart';
-import 'route_polyline_projector.dart';
+import 'route_geometry.dart';
 
 /// A single idle stretch to paint red: the projected [polyline] geometry plus
 /// the recorded [cause] (so the painter can apply the AC-9 non-colour cue —
@@ -75,7 +75,7 @@ abstract final class IdleTraceMapper {
   static List<IdleStretch> resolve({
     required List<ActivitySegment> segments,
     required double routeStartOffsetKm,
-    required RoutePolylineProjector projector,
+    required RouteGeometry projector,
   }) {
     final stretches = <IdleStretch>[];
     final routeLength = projector.routeLengthKm;

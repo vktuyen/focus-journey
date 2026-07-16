@@ -9,10 +9,11 @@
 //   fvm flutter test integration_test/route_planner_v2_flow_test.dart -d macos
 //
 // Traceability (one test ↔ one case; TC + AC ids in each description):
-//   TC-314 (AC-6)  review + edit + cancel leaves offset/position/cumulative/
+//   TC-314 (AC-6)  review + cancel leaves offset/position/cumulative/
 //                  persisted-state byte-identical; ZERO repository writes (gating)
 //   TC-315 (AC-6)  opening the review screen alone stamps no offset, writes nothing
-//   TC-316 (AC-6/NFR-1) a burst of review edits is in-memory only — zero writes
+//   TC-316 (AC-6/NFR-1) computing the real-road readout on review is in-memory
+//                  only — zero writes
 //   TC-330 (AC-10/AC-7) confirm→travel then abandon→new-route end-to-end: new
 //                  offset, preserved cumulative, correct new-route position
 //   TC-334 (AC-12) an active custom route survives restart via the existing seam;
@@ -32,6 +33,7 @@ import 'package:focus_journey/features/route/data/shared_preferences_route_repos
 import 'package:focus_journey/features/route/domain/province.dart';
 import 'package:focus_journey/features/route/domain/province_chain.dart';
 import 'package:focus_journey/features/route/domain/province_geography.dart';
+import 'package:focus_journey/features/route/domain/road_path.dart';
 import 'package:focus_journey/features/route/domain/route_plan.dart';
 import 'package:focus_journey/features/route/domain/route_planner.dart';
 import 'package:focus_journey/features/route/domain/route_position.dart';
@@ -94,7 +96,7 @@ class _RecordingRepo implements RouteRepository {
   }
 
   @override
-  Future<RoutePlan?> loadPlan() async => _storedPlan;
+  Future<RoutePlan?> loadPlan({double currentCumulativeKm = 0}) async => _storedPlan;
 
   @override
   Future<void> savePlan(RoutePlan plan) async {
@@ -145,10 +147,10 @@ void main() {
   );
 
   group(
-    'TC-314 (AC-6) review + edit + cancel leaves everything byte-identical',
+    'TC-314 (AC-6) review + cancel leaves everything byte-identical',
     () {
       testWidgets(
-        'a full review+edit+cancel cycle records NOTHING (the gating snapshot)',
+        'a full review+cancel cycle records NOTHING (the gating snapshot)',
         (tester) async {
           final repo = _RecordingRepo();
           final cubit = RouteProgressCubit(
@@ -167,7 +169,7 @@ void main() {
           final int writesBefore = repo.totalWrites;
           expect(writesBefore, 0);
 
-          // --- Enter review, edit (remove an intermediate), then CANCEL. ---
+          // --- Enter review, then CANCEL (no confirm). ---
           var cancelled = false;
           final route = resolve(
             'can_tho',
@@ -190,11 +192,6 @@ void main() {
                 ),
               ),
             ),
-          );
-          await tester.pumpAndSettle();
-          // Edit: remove an auto-inserted intermediate.
-          await tester.tap(
-            find.byKey(const Key('route_review_remove_da_nang')),
           );
           await tester.pumpAndSettle();
           // Cancel back to the picker (no confirm).
@@ -261,8 +258,9 @@ void main() {
     );
   });
 
-  group('TC-316 (AC-6/NFR-1) a burst of review edits is in-memory only', () {
-    testWidgets('remove/restore several intermediates → still zero writes', (
+  group('TC-316 (AC-6/NFR-1) computing the real-road readout is in-memory only', () {
+    testWidgets(
+      'reviewing with a bundled road (real-road distance) writes NOTHING', (
       tester,
     ) async {
       final repo = _RecordingRepo();
@@ -274,7 +272,10 @@ void main() {
       addTearDown(cubit.close);
       cubit.updateFromDistance(740);
 
-      final route = resolve('can_tho', 'ha_noi'); // 2 intermediates
+      // A bundled reference road so the review computes the REAL road-length
+      // readout (RoadRoute.build) — a pure in-memory build, never disk/network.
+      final road = RoadPath(geography.canonicalCoordinates);
+      final route = resolve('can_tho', 'ha_noi'); // 2 pass-through provinces
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -285,6 +286,7 @@ void main() {
                 start: route.orderedNodes.first,
                 end: route.orderedNodes.last,
                 initial: route,
+                road: road,
                 onConfirm: (_) {},
                 onCancel: () {},
               ),
@@ -294,16 +296,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // A burst of edits, each triggering an in-memory re-resolve.
-      await tester.tap(find.byKey(const Key('route_review_remove_da_nang')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('route_review_remove_da_lat')));
-      await tester.pumpAndSettle();
-      // Add da_nang back.
-      await tester.tap(find.byKey(const Key('route_review_removed_da_nang')));
-      await tester.pumpAndSettle();
-
-      // Every re-resolution is in-memory only — zero writes, no offset stamped.
+      // The readout is present (computed in-memory) yet nothing is persisted.
+      expect(
+        find.byKey(const Key('route_review_total_distance')),
+        findsOneWidget,
+      );
       expect(repo.totalWrites, 0);
       expect(cubit.state.selection, isNull);
       expect(cubit.state.cumulativeDistanceKm, closeTo(740, _tol));

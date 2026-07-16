@@ -1,22 +1,25 @@
-// Widget tests for the map surface wiring (map-experience): the inline overlay
-// on the journey tab, the tap → full-screen-in-the-same-window transition, the
-// close-button / Esc dismiss back to inline, the re-homed start-picker +
-// completion celebration, the absence of a standalone "Map" nav destination, and
-// the tile-request payload (TC-231).
+// Widget tests for the map surface wiring (map-experience + vietnam-map-fidelity
+// / ADR-0008): the inline overlay on the journey tab, the tap → full-screen
+// transition, the close-button / Esc dismiss back to inline, the re-homed
+// start-picker + completion celebration, the absence of a standalone "Map" nav
+// destination, and — post-ADR-0008 — the bundled OFFLINE base on both surfaces
+// with the CC BY-SA attribution full-screen.
 //
-// The fake tile provider is injected into every surface — no test reaches the
-// network. The MapCubit + RouteProgressCubit are real, driven by scripted
+// ADR-0008(c) DROPPED the OSM `TileLayer`, so there is no tile provider to
+// inject: the base is a bundled [BaseMapGeometry] (via [buildFixtureBaseMap]),
+// rendered as a PolygonLayer, and the surface makes ZERO network calls by
+// construction. The MapCubit + RouteProgressCubit are real, driven by scripted
 // snapshots (no engine, no timers).
 //
 // Covers:
 //   AC-1  / TC-220  inline overlay renders on the journey tab; no "Map" nav tab
 //   AC-1  / TC-221  removing the Map tab does not break other navigation
-//   AC-2  / TC-222  tapping the inline overlay pushes a full-screen MaterialPageRoute
-//                   (same window — no new-window API)
+//   AC-2  / TC-222  tapping the inline overlay pushes a full-screen route
 //   AC-3  / TC-223  close button, system back (maybePop), AND Esc all dismiss
-//                   full-screen → back to inline
+//   AC-1/AC-2 / TC-803  the inline minimap renders the bundled offline base
+//   AC-9  / TC-815  full-screen shows the CC BY-SA base-map attribution
+//   AC-10 / TC-816  no OSM TileLayer / no OSM URL on either surface (offline)
 //   re-homed flows  start-picker shown when no route; celebration when completed
-//   NFR-2 / TC-231  tile requests are anonymous {z}/{x}/{y} GETs, no user data
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,12 +27,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:focus_journey/features/journey/domain/activity_segment.dart';
+import 'package:focus_journey/features/route/domain/base_map_geometry.dart';
 import 'package:focus_journey/features/route/domain/journey_direction.dart';
 import 'package:focus_journey/features/route/domain/province_chain.dart';
 import 'package:focus_journey/features/route/domain/province_geography.dart';
 import 'package:focus_journey/features/route/domain/route_plan.dart';
 import 'package:focus_journey/features/route/domain/route_repository.dart';
 import 'package:focus_journey/features/route/domain/route_selection.dart';
+import 'package:focus_journey/features/route/presentation/base_map_layer.dart';
 import 'package:focus_journey/features/route/presentation/map_cubit.dart';
 import 'package:focus_journey/features/route/presentation/map_surface.dart';
 import 'package:focus_journey/features/route/presentation/map_view.dart';
@@ -41,10 +46,12 @@ import '../map_test_fixtures.dart';
 void main() {
   late ProvinceChain chain;
   late ProvinceGeography geography;
+  late BaseMapGeometry base;
 
   setUp(() {
     chain = buildFixtureChain();
     geography = buildFixtureGeography(chain);
+    base = buildFixtureBaseMap();
   });
 
   /// An in-memory route repository (no persistence needed for these widget cases).
@@ -52,8 +59,6 @@ void main() {
 
   /// Builds a wired MapCubit + RouteProgressCubit pair and (optionally) starts a
   /// route, then feeds the map cubit a snapshot so it has a route to render.
-  ///
-  /// When [startId] is null the cubits stay route-less (the picker surface).
   ({MapCubit map, RouteProgressCubit route}) buildCubits({
     String? startId,
     JourneyDirection direction = JourneyDirection.towardHaGiang,
@@ -67,21 +72,18 @@ void main() {
     final mapCubit = MapCubit(geography: geography);
     if (startId != null) {
       final selection = selectionFor(chain, startId, direction);
-      // Drive the route cubit so its RouteViewState carries the resolved position.
       routeCubit.startNewRoute(nodeById(chain, startId), direction);
       routeCubit.updateFromDistance(routeDistanceKm);
-      // Forward to the map cubit (the wiring main.dart performs).
       mapCubit.updateFromRoute(routeCubit.state);
       mapCubit.updateFromSnapshot(progressWith(segments: segments));
-      // Keep the selection referenced (avoids an unused-var lint).
       expect(selection.start.id, startId);
     }
     return (map: mapCubit, route: routeCubit);
   }
 
   /// Pumps a faux "journey tab" hosting the inline overlay, with both cubits
-  /// provided and the fake tile provider injected.
-  Future<FakeTileProvider> pumpInlineTab(
+  /// provided and the bundled base injected (offline — no tile provider).
+  Future<void> pumpInlineTab(
     WidgetTester tester, {
     String? startId,
     double routeDistanceKm = 0,
@@ -94,7 +96,6 @@ void main() {
     );
     addTearDown(cubits.map.close);
     addTearDown(cubits.route.close);
-    final provider = FakeTileProvider();
     await tester.pumpWidget(
       MaterialApp(
         home: MultiBlocProvider(
@@ -103,10 +104,6 @@ void main() {
             BlocProvider<RouteProgressCubit>.value(value: cubits.route),
           ],
           child: Scaffold(
-            // The faux journey tab mirrors main.dart's new full-bleed layout:
-            // the scene fills the tab and the inline overlay (the floating
-            // minimap) rides on top in a Stack. A sibling label proves the rest
-            // of the tab stays functional behind the minimap.
             body: Stack(
               children: <Widget>[
                 const Positioned.fill(
@@ -115,7 +112,7 @@ void main() {
                 InlineMapOverlay(
                   chain: chain,
                   geography: geography,
-                  tileProvider: provider,
+                  baseMap: base,
                 ),
               ],
             ),
@@ -124,7 +121,14 @@ void main() {
       ),
     );
     await tester.pump();
-    return provider;
+  }
+
+  /// Whether the bundled base PolygonLayer (land fill) is in the tree.
+  bool baseMapPresent(WidgetTester tester) {
+    final layers = tester.widgetList<PolygonLayer<Object>>(
+      find.byType(PolygonLayer<Object>),
+    );
+    return layers.any((l) => l.polygons.any((p) => p.color == kLandFill));
   }
 
   group('AC-1 / TC-220 inline overlay on journey tab; no standalone Map tab', () {
@@ -133,33 +137,27 @@ void main() {
     ) async {
       await pumpInlineTab(tester, startId: 'can_tho', routeDistanceKm: 200);
 
-      // The inline overlay (and the MapView it wraps) is present on the tab.
       expect(find.byType(InlineMapOverlay), findsOneWidget);
       expect(find.byType(MapView), findsOneWidget);
-      // The journey scene sibling is intact behind the minimap (full-bleed
-      // scene + floating HUD card — not a 50/50 split).
       expect(find.text('journey-scene'), findsOneWidget);
 
-      // The minimap is a COMPACT, fixed-size HUD card (≈150×190) — not a
-      // half-screen panel. Assert the rendered InkWell card is small.
+      // The minimap is a COMPACT fixed-size HUD card (≈150×190).
       final cardSize = tester.getSize(find.byType(InkWell).first);
       expect(cardSize.width, lessThan(200));
       expect(cardSize.height, lessThan(260));
 
-      // The minimap renders the route WITHOUT live OSM tiles (showTiles:false):
-      // no TileLayer and no attribution pill inline — tiles are reserved for
-      // the full-screen surface (AC-11). This means the minimap makes no tile
-      // network calls (strictly fewer GETs — NFR-2).
+      // AC-1/AC-2 / TC-803: the minimap renders the bundled OFFLINE base.
+      expect(baseMapPresent(tester), isTrue);
+      // AC-10 / TC-816: no OSM tiles and no network tile URL anywhere (offline
+      // base). The compact minimap shows no attribution pill, so no credit text.
       expect(find.byType(TileLayer), findsNothing);
-      expect(find.textContaining('OpenStreetMap'), findsNothing);
+      expect(find.textContaining('tile.openstreetmap'), findsNothing);
 
-      // A compact expand affordance (icon, not the old wide text badge) marks
-      // it as tappable to open full-screen.
+      // A compact expand affordance marks it as tappable to open full-screen.
       expect(find.byIcon(Icons.open_in_full), findsOneWidget);
       expect(find.text('Tap to expand'), findsNothing);
 
-      // NFR-3 / TC-232: the card stays screen-reader reachable via a Semantics
-      // button label even though the visible text badge is gone.
+      // NFR-3 / TC-232: the card stays screen-reader reachable.
       final semantics = tester.widget<Semantics>(
         find.byWidgetPredicate(
           (w) =>
@@ -175,8 +173,6 @@ void main() {
     testWidgets('the nav shell exposes NO NavigationDestination labelled "Map"', (
       tester,
     ) async {
-      // Build a minimal nav shell mirroring main.dart's _HomeTabs destinations
-      // (Journey / Stats / Badges / Settings — the Map tab was removed, AC-1).
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -206,13 +202,11 @@ void main() {
       );
       await tester.pump();
 
-      // Assert NO destination is labelled "Map" (the standalone tab is gone).
       final mapLabelled = find.descendant(
         of: find.byType(NavigationBar),
         matching: find.text('Map'),
       );
       expect(mapLabelled, findsNothing);
-      // The remaining tabs are present.
       expect(find.text('Journey'), findsOneWidget);
       expect(find.text('Stats'), findsOneWidget);
       expect(find.text('Settings'), findsOneWidget);
@@ -230,20 +224,16 @@ void main() {
           );
           await tester.pump();
 
-          // Start on Journey.
           expect(find.text('JOURNEY-BODY'), findsOneWidget);
-          // Tap Stats, then Settings — each reachable, no crash/blank.
           await tester.tap(find.text('Stats'));
           await tester.pumpAndSettle();
           expect(find.text('STATS-BODY'), findsOneWidget);
           await tester.tap(find.text('Settings'));
           await tester.pumpAndSettle();
           expect(find.text('SETTINGS-BODY'), findsOneWidget);
-          // Back to Journey.
           await tester.tap(find.text('Journey'));
           await tester.pumpAndSettle();
           expect(find.text('JOURNEY-BODY'), findsOneWidget);
-          // No exception across the whole navigation sweep.
           expect(tester.takeException(), isNull);
         },
       );
@@ -258,22 +248,18 @@ void main() {
         (tester) async {
           await pumpInlineTab(tester, startId: 'can_tho', routeDistanceKm: 200);
 
-          // Full-screen is not present yet.
           expect(find.byType(FullScreenMap), findsNothing);
-
-          // Tap the minimap card (the single tap target — a Semantics button
-          // InkWell anchored bottom-right).
           await tester.tap(find.byType(InkWell));
           await tester.pumpAndSettle();
 
-          // A full-screen MapView is now pushed — in the SAME Navigator (a
-          // MaterialPageRoute), not a new OS window.
           expect(find.byType(FullScreenMap), findsOneWidget);
-          // The close affordance for the full-screen surface is present.
           expect(
             find.byKey(const Key('map_full_screen_close')),
             findsOneWidget,
           );
+          // The full-screen surface also renders the base offline (no tiles).
+          expect(baseMapPresent(tester), isTrue);
+          expect(find.byType(TileLayer), findsNothing);
         },
       );
     },
@@ -295,7 +281,6 @@ void main() {
       await tester.tap(find.byKey(const Key('map_full_screen_close')));
       await tester.pumpAndSettle();
 
-      // Back to inline; the journey scene sibling is still there & functional.
       expect(find.byType(FullScreenMap), findsNothing);
       expect(find.byType(InlineMapOverlay), findsOneWidget);
       expect(find.text('journey-scene'), findsOneWidget);
@@ -315,21 +300,14 @@ void main() {
     });
 
     testWidgets(
-      'AC-3/TC-223: the system-back path (maybePop) dismisses full-screen '
-      'back to inline, journey tab intact',
+      'AC-3/TC-223: the system-back path (maybePop) dismisses full-screen',
       (tester) async {
         await openFullScreen(tester);
 
-        // System back: route the platform "pop route" event through the same
-        // Navigator.maybePop seam the close button + back gesture invoke (the
-        // third AC-3 dismiss affordance, distinct from the close button & Esc).
         final handled = await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
 
-        // The back event was consumed by the pushed full-screen route (not the
-        // app/OS), proving it popped within the same Navigator stack.
         expect(handled, isTrue);
-        // Back to the inline overlay; the journey scene sibling is intact.
         expect(find.byType(FullScreenMap), findsNothing);
         expect(find.byType(InlineMapOverlay), findsOneWidget);
         expect(find.text('journey-scene'), findsOneWidget);
@@ -337,18 +315,46 @@ void main() {
     );
   });
 
+  group('AC-9 / TC-815 + AC-10 / TC-816 attribution + offline (no OSM)', () {
+    testWidgets(
+      'full-screen shows the CC BY-SA base-map credit; no OSM tile/URL',
+      (tester) async {
+        await pumpInlineTab(tester, startId: 'can_tho', routeDistanceKm: 200);
+        await tester.tap(find.byType(InkWell));
+        await tester.pumpAndSettle();
+
+        // The mandatory share-alike credit for the bundled Wikimedia base.
+        expect(find.text(kBaseMapAttribution), findsOneWidget);
+        expect(find.textContaining('CC BY-SA'), findsOneWidget);
+        // route-real-road / NFR-4: the mandatory ODbL credit for the bundled road
+        // geometry sits alongside it.
+        expect(find.text(kRoadAttribution), findsOneWidget);
+        // The dropped OSM tile base leaves no tile layer and no network tile URL
+        // (offline base). The ODbL attribution above is a static credit, not a
+        // fetch — the offline guard is on the tile LAYER + tile URL only.
+        expect(find.byType(TileLayer), findsNothing);
+        expect(find.textContaining('tile.openstreetmap'), findsNothing);
+      },
+    );
+
+    testWidgets('the inline minimap does NOT show the attribution pill', (
+      tester,
+    ) async {
+      await pumpInlineTab(tester, startId: 'can_tho', routeDistanceKm: 200);
+
+      expect(find.text(kBaseMapAttribution), findsNothing);
+      expect(find.textContaining('CC BY-SA'), findsNothing);
+    });
+  });
+
   group('Re-homed flows: start-picker (no route) + celebration (completed)', () {
     testWidgets(
       'the inline overlay shows the start-picker when no route is active',
       (tester) async {
-        // No startId → the cubits stay route-less.
         await pumpInlineTab(tester);
 
-        // The route-planner-v2 picker → review flow is reachable inline
-        // (replacing the shipped start-picker — ADR-0005 supersedes it).
         expect(find.byType(RoutePicker), findsOneWidget);
         expect(find.byKey(const Key('route_picker_continue')), findsOneWidget);
-        // No full-screen MapView is shown for a route-less state.
         expect(find.byType(MapView), findsNothing);
       },
     );
@@ -356,23 +362,18 @@ void main() {
     testWidgets(
       'the completion celebration appears full-screen when the route completed',
       (tester) async {
-        // Drive a completed route (past the 1380 km Cần Thơ→Hà Giang length).
         await pumpInlineTab(tester, startId: 'can_tho', routeDistanceKm: 2000);
         await tester.tap(find.byType(InkWell));
         await tester.pumpAndSettle();
 
-        // The re-homed completion celebration is shown over the full-screen map
-        // (it does NOT block completion — AC-10).
         expect(find.byKey(const Key('completion_start_new')), findsOneWidget);
         expect(find.textContaining('You reached'), findsOneWidget);
-        // The map still rendered behind the celebration.
         expect(find.byType(MapView), findsOneWidget);
       },
     );
   });
 
   group('Full-screen enrichment: route readout + legend (full-screen only)', () {
-    /// Opens the full-screen surface over an active mid-route.
     Future<void> openFullScreenMidRoute(WidgetTester tester) async {
       await pumpInlineTab(tester, startId: 'can_tho', routeDistanceKm: 200);
       await tester.tap(find.byType(InkWell));
@@ -381,54 +382,41 @@ void main() {
     }
 
     testWidgets(
-      'the full-screen surface shows the route readout (Next / km to / % of '
-      'Vietnam), reading state.position',
+      'the full-screen surface shows the route readout, reading state.position',
       (tester) async {
         await openFullScreenMidRoute(tester);
 
-        // The re-homed readout card is present full-screen.
         expect(find.byKey(const Key('map_route_readout')), findsOneWidget);
-        // Line 1: next checkpoint + distance (mid-route, next != null).
         expect(find.textContaining('Next:'), findsOneWidget);
-        // Line 2: distance to destination.
         expect(find.textContaining(RegExp(r'km to ')), findsOneWidget);
-        // Line 3: percent of Vietnam.
         expect(find.textContaining('% of Vietnam'), findsOneWidget);
       },
     );
 
     testWidgets(
-      'the readout shows "Arrived at" (not "Next:") once the route completes '
-      '(AC-10) and does not block the completion celebration',
+      'the readout shows "Arrived at" once the route completes (AC-10)',
       (tester) async {
-        // Drive a completed route (past the 1380 km Cần Thơ→Hà Giang length).
         await pumpInlineTab(tester, startId: 'can_tho', routeDistanceKm: 2000);
         await tester.tap(find.byType(InkWell));
         await tester.pumpAndSettle();
 
-        // The readout reflects arrival (position.next == null branch).
         expect(find.byKey(const Key('map_route_readout')), findsOneWidget);
         expect(find.textContaining('Arrived at'), findsOneWidget);
         expect(find.textContaining('Next:'), findsNothing);
-        // The completion celebration is NOT blocked by the readout (AC-10).
         expect(find.byKey(const Key('completion_start_new')), findsOneWidget);
       },
     );
 
     testWidgets(
-      'the full-screen surface shows the legend with the solid-vs-dashed idle '
-      'cue (AC-9 / NFR-3 colour-blind aid)',
+      'the full-screen legend restates the solid-vs-dashed idle cue (NFR-3)',
       (tester) async {
         await openFullScreenMidRoute(tester);
 
-        // The legend card is present full-screen.
         expect(find.byKey(const Key('map_legend')), findsOneWidget);
         expect(find.text('Legend'), findsOneWidget);
-        // Symbol explanations: position, checkpoint, route, both idle causes.
         expect(find.text('Current position'), findsOneWidget);
         expect(find.text('Checkpoint / stop'), findsOneWidget);
         expect(find.text('Route'), findsOneWidget);
-        // The AC-9 non-colour cue is stated in words (solid vs dashed).
         expect(find.textContaining('voluntary pause (solid)'), findsOneWidget);
         expect(find.textContaining('lock / sleep (dashed)'), findsOneWidget);
       },
@@ -439,70 +427,11 @@ void main() {
       (tester) async {
         await pumpInlineTab(tester, startId: 'can_tho', routeDistanceKm: 200);
 
-        // The inline minimap is the only surface; no full-screen overlays leak
-        // onto it (readout + legend are full-screen-only).
         expect(find.byKey(const Key('map_route_readout')), findsNothing);
         expect(find.byKey(const Key('map_legend')), findsNothing);
         expect(find.text('Legend'), findsNothing);
       },
     );
-  });
-
-  group('NFR-2 / TC-231 tile requests are anonymous {z}/{x}/{y} GETs', () {
-    testWidgets('the minimap makes NO tile requests (no live tiles inline)', (
-      tester,
-    ) async {
-      final provider = await pumpInlineTab(
-        tester,
-        startId: 'can_tho',
-        routeDistanceKm: 200,
-      );
-      // Give any (nonexistent) inline tile layer a chance to request tiles.
-      await tester.pump(const Duration(milliseconds: 50));
-
-      // The minimap renders without live OSM tiles (showTiles:false), so it
-      // issues ZERO tile GETs — strictly fewer than before (better for
-      // NFR-2). Tiles are reserved for the full-screen surface (below).
-      expect(provider.requestedUrls, isEmpty);
-    });
-
-    testWidgets('full-screen tile URLs carry only coordinates — no user data', (
-      tester,
-    ) async {
-      final provider = await pumpInlineTab(
-        tester,
-        startId: 'can_tho',
-        routeDistanceKm: 200,
-      );
-      // Open the full-screen surface, where live OSM tiles DO load (AC-11).
-      await tester.tap(find.byType(InkWell));
-      await tester.pumpAndSettle();
-      // Let the tile layer request tiles from the injected fake provider.
-      await tester.pump(const Duration(milliseconds: 50));
-
-      // The fake provider was used (proving no real network provider was hit).
-      // Each requested URL is the standard OSM tile endpoint, with no query
-      // string and no user identifier / location / idle data — only z/x/y.
-      expect(provider.requestedUrls, isNotEmpty);
-      for (final url in provider.requestedUrls) {
-        expect(url, startsWith('https://tile.openstreetmap.org/'));
-        expect(url, endsWith('.png'));
-        expect(url.contains('?'), isFalse, reason: 'no query payload: $url');
-        // Path is exactly /{z}/{x}/{y}.png — three integer segments.
-        final path = url
-            .replaceFirst('https://tile.openstreetmap.org/', '')
-            .replaceFirst('.png', '');
-        final parts = path.split('/');
-        expect(parts, hasLength(3), reason: 'expected z/x/y in $url');
-        for (final part in parts) {
-          expect(
-            int.tryParse(part),
-            isNotNull,
-            reason: 'tile coordinate "$part" must be an integer (no payload)',
-          );
-        }
-      }
-    });
   });
 }
 
@@ -518,15 +447,14 @@ class _InMemoryRouteRepo implements RouteRepository {
   Future<void> save(RouteSelection selection) async => _stored = selection;
 
   @override
-  Future<RoutePlan?> loadPlan() async => _storedPlan;
+  Future<RoutePlan?> loadPlan({double currentCumulativeKm = 0}) async => _storedPlan;
 
   @override
   Future<void> savePlan(RoutePlan plan) async => _storedPlan = plan;
 }
 
 /// A minimal nav shell mirroring main.dart's post-removal tab set (Journey /
-/// Stats / Badges / Settings — no Map tab). Used by TC-221 to prove navigation
-/// between the remaining tabs still works after the Map tab's removal.
+/// Stats / Badges / Settings — no Map tab). Used by TC-221.
 class _NavShellHarness extends StatefulWidget {
   const _NavShellHarness({required this.chain});
 

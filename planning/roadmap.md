@@ -11,7 +11,38 @@ The **single** roadmap + "what do I run next" tracker. (This file absorbed the o
 
 ## Where I am right now
 
-_Last updated: 2026-06-26_
+_Last updated: 2026-07-16_
+
+- 🚧 **NEW WAVE — `refine-app-ui-ux` (started 2026-07-15).** Opening slice **`journey-reset` ✅ SHIPPED
+  2026-07-15** (dev build, macOS-verified) — in [done/](done/journey-reset.md). Settings factory-reset (full
+  wipe → first-run) + launch Resume/Start-over prompt (Start-over keeps lifetime stats, reusing ADR-0005).
+  `/review-code` approved (0 Blocking) · `/privacy-audit` PASS · `/execute-tests` **green 1235/1235**;
+  AC-1..12 + NFR-2 `[x]`. **`active/` is now empty.** Carried follow-ups (see the done ledger): reset-seam
+  ADR (`/add-adr`), drift-guard + NFR static tests, launch-at-startup-OS-state question, product-copy TODOs,
+  and the on-device/Windows release legs.
+- ✅ **`vietnam-map-fidelity` SHIPPED 2026-07-15** (dev build, macOS-verified) — in [done/](done/vietnam-map-fidelity.md).
+  Current 34-province (2026) map: bundled GeoJSON `PolygonLayer` (ADR-0008), single-tone, **OSM tiles dropped →
+  ZERO network egress**, CC BY-SA credit. Review resolved (option A) · privacy PASS · tests green (1297/1/0);
+  AC-1..11 + NFR-2 `[x]`. (Also shipped: **`map-bundle-weight`** quick-change — trimmed 2.7 MB of unused
+  source SVGs out of the app bundle.)
+- ✅ **`province-chain-2026` SHIPPED 2026-07-16** — in [done/](done/province-chain-2026.md). Rebuilt the journey
+  province/route **data model** onto all 34 current units (2026 reform) — a coast-hugging great-circle S→N spine,
+  migration-by-reset for retired ids, ADR-0009 ratified. Review approved + privacy PASS; execute-tests **green
+  (285/285)**; AC-1..11 + NFR-1..3 `[x]`.
+- ✅ **`route-real-road` SHIPPED 2026-07-16** — in [done/](done/route-real-road.md). The journey route now follows
+  the **real bundled national highway** (QL1A+QL4A, OSM/ODbL, offline): curved on-land road, big markers ONLY on
+  start/end/user-stops, **detours out to off-highway stops** (An Giang etc.), road-length distance/progress. The
+  authoring **review lists only anchors** (remove-intermediate feature dropped); journey is **paused until a route
+  is confirmed** and **freezes on arrival** (no manual button). "Factory reset" → "Reset everything". Review
+  approved + privacy PASS; execute-tests **green (1481 unit/widget + 18 e2e)**; AC-1..9 + NFR-1..4 `[x]`.
+  **`active/` is now empty.**
+
+### 👉 Immediate next action (2026-07-16)
+**`refine-app-ui-ux` wave: `journey-reset` · `vietnam-map-fidelity` · `province-chain-2026` · `route-real-road` all SHIPPED. `active/` is empty.** All slice work is on branch `feat/journey-reset`, **uncommitted** (staged working tree).
+- **👉 Commit / open a PR** for the shipped `refine-app-ui-ux` work (branch `feat/journey-reset`) when ready — the user drives git per repo policy.
+- **Known carried follow-ups (shipped with residual, user-approved):** off-highway stops use a straight out-and-back **spur** not real secondary roads (future: bundle provincial connectors); `_resetPlan` still seeds the v2 `coastalCorridorNodeIds` (harmless); Cao Bằng north end ~19 km connector; **`system-architect` note**: route-real-road's OSM/ODbL attribution supersedes `vietnam-map-fidelity` AC-9/AC-10 "no OSM credit" → ADR/spec amendment.
+- **Or harden `journey-reset` follow-ups / release-readiness:** reset-seam ADR (`/add-adr`), on-device/Windows legs across shipped slices.
+  _(Further UI/UX-refinement slices for this wave: TBD — capture with `/capture-idea`.)_
 
 - ✅ **`visual-polish` epic COMPLETE (2026-06-26)** — Wave 1 `journey-scene-art-v3` · Wave 2
   `journey-dynamic-curve` + `journey-cockpit-lean` · Wave 3 **`vehicle-picker`** (production mode selector,
@@ -44,8 +75,9 @@ AC-1..15 + NFR-1/2/3 all `[x]`. The throwaway **`dev-mode-switcher`** was remove
 - **Release-readiness (recommended):** burn down the carried **pre-public / Windows legs** across shipped slices —
   on-device ≥30fps (TC-M-NF1), real-OS frameless-PiP visuals (TC-M-PIP), motion-comfort feel (TC-M-FEEL),
   icon-cohesion/a11y (TC-M-ART / TC-M-A11Y), and the **Windows runtime** pass (all shipped work is macOS-verified only).
-- **Or a new epic:** e.g. the deferred `journey-energy-model` (per-mode speeds — note ADR-0007's firewall), or
-  Wave-3 ideas `ai-coach` / `signed-distribution`. Start fuzzy ones with `/capture-idea`.
+- **Or promote the captured idea:** **`journey-reset`** (factory reset + resume/start-over launch prompt,
+  Size M) — `/new-feature journey-reset`. Other deferred options: `journey-energy-model` (per-mode speeds —
+  note ADR-0007's firewall) or `signed-distribution`. Start fuzzy ones with `/capture-idea`.
 
 **(history) `vehicle-picker` — Phase 2 (Spec) — `visual-polish` Wave 3 (the production mode selector).**
 Active in [active/vehicle-picker.md](active/vehicle-picker.md); spec [specs/vehicle-picker/spec.md](../specs/vehicle-picker/spec.md).
@@ -120,7 +152,7 @@ is now empty — no slice in flight.** ⚠️ Pre-public/Windows: NFR-1 on-devic
 - **👉 `/new-feature journey-dynamic-curve`** — F1-style sweeping/animated bends; highest risk-to-invariants
   slice (must preserve AC-7 even-spacing, arc-length-aware if needed, + ≥30fps). Then `journey-cockpit-lean`
   `[blocked by: journey-dynamic-curve]`. (Wave 3 `vehicle-picker` needs its precedence ADR first — `/add-adr`.)
-- **Or:** Wave 3 (`ai-coach` · `signed-distribution`), or burn down the carried pre-public release legs.
+- **Or:** `signed-distribution`, or burn down the carried pre-public release legs.
 
 **Wave 2 feature wave (history): `journey-pov` ✅ SHIPPED 2026-06-25 (dev build) — closed it.** In
 [done/](done/journey-pov.md). The #2 first-person cockpit POV (car = through-windshield, motorbike =
@@ -131,7 +163,7 @@ AC-1..11/13/14/15/17 + NFR-2 ticked; AC-12 (real-OS PiP) · AC-16 (art-cohesion)
 NFR-3 (silhouette visual) carried as pre-public-release legs. **`active/` is now empty — no slice in flight.**
 
 **Pick the next initiative:**
-- **Wave 3 (v3):** `ai-coach` · `signed-distribution` — start when ready (create child backlog items, then
+- **Wave 3 (v3):** `signed-distribution` — start when ready (create child backlog items, then
   `/new-feature <slug>` each).
 - **Harden for release:** burn down the per-slice "Carried before any public / Windows release" legs below
   (on-device fps / a11y / runtime-egress / Windows runtime — now including journey-pov's 4 carried legs).
@@ -186,7 +218,24 @@ Helpers fire **automatically** inside these phases (don't call them directly):
 
 ## Now / Next / Later
 
-### Now — Wave 2 (v2), STARTED 2026-06-24
+### Now — `refine-app-ui-ux` wave, STARTED 2026-07-15
+Theme: refine the app's UI/UX. Promote each slice with `/new-feature <slug>` in order.
+- **journey-reset** — Settings factory-reset (full wipe → first-run) + launch Resume/Start-over prompt
+  (Start-over reuses the ADR-0005 `abandoned` lifecycle, keeps lifetime stats). **✅ SHIPPED 2026-07-15**
+  (dev build, macOS-verified) — review approved (0 Blocking), privacy PASS, tests **green 1235/1235**;
+  in [done/](done/journey-reset.md).
+- **vietnam-map-fidelity** — Vietnam's current **2026 / 34-province** map (accurate, offline, georeferenced),
+  journey overlaid. **✅ SHIPPED 2026-07-15** (dev build, macOS-verified) per **ADR-0008** (SVG→GeoJSON
+  `PolygonLayer`, single-tone, OSM tiles dropped → **zero egress**, CC BY-SA credit); review resolved (opt A),
+  privacy PASS, tests green 1297/1/0; AC-1..11 + NFR-2 `[x]`; in [done/](done/vietnam-map-fidelity.md).
+- **province-chain-2026** — rebuild the journey province/route **data model** onto all 34 current units: one
+  coast-hugging south→north spine through every province (great-circle distances), which also fixes the
+  carried route-hugs-coast limitation. **🚧 ACTIVE — Phase 2 (Spec)**; spec drafted (11 ACs + 3 NFRs), ordering
+  /migration framed → ADR-0009 at build. **✅ approved + test cases designed → 👉 `/implement province-chain-2026`.**
+- **map-bundle-weight** — quick-change: trimmed 2.7 MB of unused source SVGs out of the app bundle. **✅ SHIPPED 2026-07-15** — in [done/](done/map-bundle-weight.md).
+- _Further UI/UX slices: TBD — `/capture-idea <slug>` as defined._
+
+### Now (history) — Wave 2 (v2), STARTED 2026-06-24
 - **mini-window** — ✅ SHIPPED 2026-06-24 (macOS-verified). ⚠️ Windows tray-icon authoring + Windows
   runtime, macOS manual legs, fps, runtime-privacy carried before public/Windows release (see
   [done/mini-window.md](done/mini-window.md)).
@@ -214,8 +263,7 @@ Helpers fire **automatically** inside these phases (don't call them directly):
   (dev build, macOS-verified)** — 12 ACs + 3 NFRs; ADR-0005 (sub-chain model); **877/877 green**; review
   ready · privacy PASS — in [done/](done/route-planner-v2.md). ⚠️ Pre-public/Windows: fps (TC-M-NF1),
   a11y screen-reader (TC-M-A11Y), runtime egress (TC-M-PRIV), Windows runtime.
-- **journey-energy-model** — per-mode speeds + energy/fuel strategy · [blocked by: journey-engine ✅]. Not started.
-- **team-leaderboard** — backend + team race (its own sub-epic) · [blocked by: local-stats ✅]. Not started.
+- **journey-energy-model** — per-mode speeds + energy/fuel strategy · [blocked by: journey-engine ✅]. Not started (deferred, see Later).
 
 > ✅ **Wave 2 feature wave shipped in this order:** idle-accounting ‖ journey-scene-v2 → mini-window →
 > map-experience → route-planner-v2 → **journey-pov** (2026-06-25, the POV-reframing extra closed the wave).
@@ -235,10 +283,12 @@ Decisions taken at capture: vehicle pick = **cosmetic-only override**; F1-curve 
   `[blocked by: precedence ADR]` (write with `/add-adr` first).
 
 ### Later
-- **Wave 3 (v3):** `ai-coach` · `signed-distribution` (Apple signing/notarization + installer).
-- Child backlog files for Wave 3 are created when that wave starts — wave discipline.
 - **`journey-energy-model`** (per-mode speeds) — note the forward-dependency: `vehicle-picker`'s cosmetic-only
   contract must hold even after this lands (a user pick must never change accrual).
+- **`signed-distribution`** (Apple signing/notarization + installer) — for any public release.
+
+> **Scope guardrail (2026-07-15, Kevin):** local, single-user product only — no team, online, leaderboard,
+> or AI-coach features. Any such idea is explicitly out of scope; do not add it to a wave.
 
 ---
 

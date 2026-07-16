@@ -36,6 +36,8 @@ import '../domain/journey_direction.dart';
 import '../domain/province.dart';
 import '../domain/province_chain.dart';
 import '../domain/province_geography.dart';
+import '../domain/road_path.dart';
+import '../domain/road_route.dart';
 import '../domain/route_plan.dart';
 import '../domain/route_planner.dart';
 import '../domain/route_position.dart';
@@ -58,11 +60,15 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
     required ProvinceChain chain,
     required RouteRepository repository,
     ProvinceGeography? geography,
+    RoadPath? road,
     RouteSelection? initialSelection,
     RoutePlan? initialPlan,
+    void Function()? onRouteStarted,
   }) : _chain = chain,
        _geography = geography,
+       _road = road,
        _repository = repository,
+       _onRouteStarted = onRouteStarted,
        super(const RouteViewState.initial()) {
     if (initialPlan != null && !initialPlan.isAbandoned) {
       // Adopt a restored ACTIVE or COMPLETED plan onto its sub-chain (a completed
@@ -73,13 +79,34 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
       _emitResolved();
     } else if (initialSelection != null) {
       _selection = initialSelection;
+      _rebuildRoadGeometry();
       _emitResolved();
     }
   }
 
   final ProvinceChain _chain;
   final ProvinceGeography? _geography;
+
+  /// The bundled national road (route-real-road). `null` on the legacy/test path
+  /// (no asset injected) — the route then falls back to the chain-projected
+  /// polyline and the chain-km axis (shipped behaviour, unchanged).
+  final RoadPath? _road;
   final RouteRepository _repository;
+
+  /// route-real-road: invoked when the user CONFIRMS a route (the explicit
+  /// "Start journey" action — see [confirmRoute], also reached via
+  /// [abandonAndStartNew]). Lets the app-service runtime open the Start gate and
+  /// begin the ticker. A plain [void Function()] — NOT engine-coupled — so this
+  /// cubit keeps its privacy invariant (no engine/platform reference). `null` on
+  /// the legacy/test path and NEVER fired on route RESTORE (adopt-on-construct),
+  /// so a relaunch stays paused until the user resumes.
+  final void Function()? _onRouteStarted;
+
+  /// The current route drawn along the real road (route-real-road / AC-2) +
+  /// its ordered waypoint provinces (start, stops…, end). Rebuilt ONCE per route
+  /// identity change (NFR-1), reused across distance ticks.
+  RoadRoute? _roadRoute;
+  List<Province> _waypoints = const <Province>[];
 
   /// The internal per-sub-chain resolver/projector input (AC-7). For a legacy
   /// selection this is the selection over [_chain]; for a v2 plan it is derived
@@ -98,6 +125,10 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
   /// The chain the resolver runs over: the derived sub-chain for a v2 plan, else
   /// the injected full chain (legacy path).
   ProvinceChain get _routeChain => _resolved?.subChain ?? _chain;
+
+  /// The active plan's user-marked stops (route-real-road / AC-4). Empty on the
+  /// legacy path and for a default/migrated full-spine plan (AC-3).
+  List<String> get _markedStopIds => _plan?.markedStopIds ?? const <String>[];
 
   /// Receives the engine's latest cumulative `distanceKm` (a plain scalar — the
   /// only thing this slice reads from the engine; AC-16). Re-resolves and emits.
@@ -125,7 +156,11 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
     _plan = plan;
     _resolved = resolved;
     _selection = plan.toSelection(resolved);
+    _rebuildRoadGeometry();
     _emitResolved();
+    // route-real-road: confirming a route IS the explicit start — open the Start
+    // gate so the runtime begins the ticker (a relaunch later stays paused).
+    _onRouteStarted?.call();
     await _repository.savePlan(plan);
   }
 
@@ -205,6 +240,7 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
     _plan = null;
     _resolved = null;
     _selection = selection;
+    _rebuildRoadGeometry();
     _emitResolved();
     await _repository.save(selection);
   }
@@ -222,6 +258,54 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
     _plan = plan;
     _resolved = resolved;
     _selection = plan.toSelection(resolved);
+    _rebuildRoadGeometry();
+  }
+
+  /// Rebuilds the drawn road geometry for the current route (route-real-road /
+  /// AC-2): the ordered waypoint provinces (start, user stops…, end) snapped to
+  /// the bundled highway. Called ONCE per route identity change (NFR-1); a mere
+  /// distance tick reuses the cached [_roadRoute]. A no-op (clears the road) when
+  /// no road asset is injected, no route is active, or geography is unavailable —
+  /// the resolver then falls back to the chain-km axis (legacy behaviour).
+  void _rebuildRoadGeometry() {
+    final road = _road;
+    final selection = _selection;
+    final resolved = _resolved;
+    final geography = resolved?.subGeography ?? _geography;
+    if (road == null || selection == null || geography == null) {
+      _roadRoute = null;
+      _waypoints = const <Province>[];
+      return;
+    }
+    // The route's checkpoints in travel order (origin → destination).
+    final ordered = resolved != null
+        ? resolved.orderedNodes
+        : <Province>[
+            selection.start,
+            _chain.destinationOf(selection.start, selection.direction),
+          ];
+    if (ordered.length < 2) {
+      _roadRoute = null;
+      _waypoints = const <Province>[];
+      return;
+    }
+    // The waypoints are ONLY the emphasized checkpoints — start, end, and any
+    // user-marked stops — in travel order (Google-style; no per-province dots,
+    // AC-3). The drawn road sub-path threads through exactly these.
+    final emphasized = <String>{
+      ordered.first.id,
+      ordered.last.id,
+      ..._markedStopIds,
+    };
+    final waypoints = <Province>[
+      for (final node in ordered)
+        if (emphasized.contains(node.id)) node,
+    ];
+    final coords = <GeoCoordinate>[
+      for (final node in waypoints) geography.coordinateOf(node),
+    ];
+    _waypoints = List<Province>.unmodifiable(waypoints);
+    _roadRoute = RoadRoute.build(road: road, waypoints: coords);
   }
 
   /// Resolves the current selection against the current cumulative distance and
@@ -241,10 +325,33 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
       return;
     }
     final routeChain = _routeChain;
-    final routeDistanceKm =
+    final rawRouteDistanceKm =
         _cumulativeDistanceKm - selection.routeStartOffsetKm;
+    // route-real-road: when the route is drawn along the real road, the ROAD
+    // sub-path length is the authoritative route-length axis, and the engine's
+    // rate is derived from the default road length ÷ 8 (main.dart). The pure chain
+    // resolver is left UNCHANGED (its shipped tests stay green); we convert the
+    // road-km progress FRACTION into the resolver's canonical chain-km axis so its
+    // completion, `fractionAlongRoute`, and % all key off the drawn road (the
+    // marker reaches the road end exactly at ~8 active hours). Falls back to the
+    // raw chain distance on the legacy/no-road path.
+    final roadRoute = _roadRoute;
+    final double resolverDistanceKm;
+    if (roadRoute != null && roadRoute.routeLengthKm > 0) {
+      final chainSubKm = routeChain.distanceToDestination(
+        selection.start,
+        selection.direction,
+      );
+      final rawFraction = rawRouteDistanceKm / roadRoute.routeLengthKm;
+      final fraction = rawFraction.isFinite
+          ? rawFraction.clamp(0.0, 1.0)
+          : 0.0;
+      resolverDistanceKm = fraction * chainSubKm;
+    } else {
+      resolverDistanceKm = rawRouteDistanceKm;
+    }
     final position = RouteProgressResolver.resolve(
-      routeDistanceKm: routeDistanceKm,
+      routeDistanceKm: resolverDistanceKm,
       selection: selection,
       chain: routeChain,
     );
@@ -270,6 +377,9 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
         position: position,
         countryPercent: countryPercent,
         cumulativeDistanceKm: _cumulativeDistanceKm,
+        markedStopIds: _markedStopIds,
+        roadRoute: _roadRoute,
+        waypoints: _waypoints,
       ),
     );
   }
@@ -299,6 +409,9 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
             position: position,
             countryPercent: countryPercent,
             cumulativeDistanceKm: _cumulativeDistanceKm,
+            markedStopIds: _markedStopIds,
+            roadRoute: _roadRoute,
+            waypoints: _waypoints,
           ),
         );
         _repository.savePlan(completedPlan);
@@ -311,6 +424,9 @@ class RouteProgressCubit extends Cubit<RouteViewState> {
           position: position,
           countryPercent: countryPercent,
           cumulativeDistanceKm: _cumulativeDistanceKm,
+          markedStopIds: _markedStopIds,
+          roadRoute: _roadRoute,
+          waypoints: _waypoints,
         ),
       );
       return;
