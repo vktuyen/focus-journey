@@ -8,7 +8,7 @@ Generate an HTML progress summary using the shared template at **`specs/_templat
 `$ARGUMENTS` is a space- (or comma-) separated list of feature slugs.
 
 - **One slug** → single-feature mode. Write to `specs/<slug>/summary.html`.
-- **Two or more slugs** → **epic mode**. The slugs form one epic; the **first slug is the umbrella** (its title/problem drives the hero, and the file is written to its folder). Write the combined page to **`specs/<first-slug>/summary.html`**.
+- **Two or more slugs** → **epic mode**. The slugs form one epic; the **first slug is the umbrella** (its title/problem drives the hero). The page covers the whole project, so it is written to the project-level path **`specs/summary.html`** (NOT inside any one feature's folder — burying a project-wide overview in a single spec folder is misleading). The umbrella still only drives the hero *content*, not the file location.
 
 The page summarises progress for a non-technical stakeholder — what it is, where it stands, what's been agreed (acceptance criteria), the domain knowledge it touches, and the proof it works (tests) — and **explicitly flags any artifact that was scanned for but not found**.
 
@@ -69,7 +69,7 @@ Read once for the whole run (project-level, not per slug):
 - **Timeline** (single only): real dates only; `tl-dot done` for ship.
 
 ## Output rules
-- Single-slug → `specs/<slug>/summary.html`. Epic → `specs/<first-slug>/summary.html`. Overwrite if it exists.
+- Single-slug → `specs/<slug>/summary.html`. Epic (2+ slugs) → `specs/summary.html` (project-level, NOT the umbrella's folder). Overwrite if it exists.
 - One valid HTML5 file. The only external resource is the JobLogic logo URL already in the template; add no other external CSS/JS/fonts.
 - Every number, date, AC, rule, persona, glossary term, and test result must come from files you read — **do not fabricate**. A scanned-but-absent artifact is `✗`, never a guess.
 

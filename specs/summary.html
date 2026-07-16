@@ -255,8 +255,8 @@
   <div class="hero-inner">
     <div class="hero-badge">JobLogic · Agentic FX</div>
     <h1>Vietnam Focus Journey — the full build</h1>
-    <div class="slug">Umbrella: <code>journey-engine</code> · 15 shipped slugs (v1 MVP → v2 → visual-polish) · Owner: Kevin (Tuyen Vo)</div>
-    <p>Something has to be the core loop that converts "the user is actively working" into "the traveller moved N kilometres" — and does it <em>honestly</em>, <em>deterministically</em>, and in a way the rest of the app (Flame scene, map, stats) can trust. That loop is the <code>JourneyEngine</code>; the other 14 slugs are the map, scene, cockpit, stats, mini-window and picker built faithfully on top of it.</p>
+    <div class="slug">Umbrella: <code>journey-engine</code> · 20 shipped slugs (v1 MVP → v2 → visual-polish → refine-app-ui-ux) · Owner: Kevin (Tuyen Vo)</div>
+    <p>Something has to be the core loop that converts "the user is actively working" into "the traveller moved N kilometres" — and does it <em>honestly</em>, <em>deterministically</em>, and in a way the rest of the app (Flame scene, map, stats) can trust. That loop is the <code>JourneyEngine</code>; the other 19 slugs are the map, scene, cockpit, stats, mini-window, picker, and the latest UI/UX-refinement wave (accurate 34-province Vietnam map, real-road route, and reset) built faithfully on top of it.</p>
   </div>
 </div>
 
@@ -264,16 +264,16 @@
 <section id="overview">
   <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:8px;">
     <h2>Overview</h2>
-    <span class="status-badge shipped">✓ 15 / 15 Shipped</span>
+    <span class="status-badge shipped">✓ 20 / 20 Shipped</span>
   </div>
 
   <div class="dk-block-title" style="margin-bottom:12px;">At a glance</div>
 
   <div class="rollup">
-    <div class="r-item"><div class="r-num">15</div><div class="r-label">Slugs (all shipped)</div></div>
-    <div class="r-item"><div class="r-num">94%</div><div class="r-label">ACs verified · 254 / 271</div></div>
-    <div class="r-item"><div class="r-num">15 🟢</div><div class="r-label">Test runs · all green</div></div>
-    <div class="r-item"><div class="r-num">350</div><div class="r-label">Test cases designed</div></div>
+    <div class="r-item"><div class="r-num">20</div><div class="r-label">Slugs (all shipped)</div></div>
+    <div class="r-item"><div class="r-num">94%</div><div class="r-label">ACs verified · 309 / 330</div></div>
+    <div class="r-item"><div class="r-num">20 🟢</div><div class="r-label">Test runs · all green</div></div>
+    <div class="r-item"><div class="r-num">429</div><div class="r-label">Test cases designed</div></div>
     <div class="r-item"><div class="r-num">0 · 0</div><div class="r-label">Business rules · conflicts</div></div>
   </div>
 
@@ -401,10 +401,50 @@
           <td>0 rules · 0 conflicts</td>
           <td class="gap">Icon-art / a11y / fps manual carries; no e2e/integration scripts</td>
         </tr>
+        <tr>
+          <td class="slug-cell">journey-reset</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-07-15</span></td>
+          <td><span class="pct">87%</span> · 13/15</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">NFR-1 instant-feel + NFR-3 screen-reader + Windows runtime manual; no tests/e2e|integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">vietnam-map-fidelity</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-07-15</span></td>
+          <td><span class="pct">86%</span> · 12/14</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">NFR-1 fps + NFR-3 screen-reader + Windows runtime manual; AC-5 sea-crossings → province-chain-2026; no scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">map-bundle-weight</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-07-15</span></td>
+          <td><span class="pct">100%</span> · 3/3</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">Quick-change — no designed cases file (ACs = checklist); no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">province-chain-2026</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-07-16</span></td>
+          <td><span class="pct">100%</span> · 14/14</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">On-land ≤3-sample sea-touch residual documented; no e2e/integration scripts</td>
+        </tr>
+        <tr>
+          <td class="slug-cell">route-real-road</td>
+          <td><span class="status-badge shipped">✓ Shipped · 2026-07-16</span></td>
+          <td><span class="pct">100%</span> · 13/13</td>
+          <td>🟢 green</td>
+          <td>0 rules · 0 conflicts</td>
+          <td class="gap">No designed cases file (contract = spec ACs); off-highway stop spur is straight; no scripts</td>
+        </tr>
       </tbody>
     </table>
   </div>
-  <p style="font-size:12px; color:var(--text-weak); margin-top:10px;">All 15 slugs shipped &amp; green. Epic-wide gaps: <strong>no authored scripts under <code>tests/e2e</code> / <code>tests/integration</code></strong> (both empty — execution ran via in-package Flutter suites); Personas &amp; Glossary libraries are unfilled templates; no spec uses Related-rules / BR-conflict sections (0 rules · 0 conflicts everywhere). 4 slugs carry pending on-device / manual ACs (activity-detection, map-experience, route-planner-v2, journey-pov); the rest carry manual legs only, boxes ticked.</p>
+  <p style="font-size:12px; color:var(--text-weak); margin-top:10px;">All 20 slugs shipped &amp; green across four waves. Epic-wide gaps: <strong>no authored scripts under <code>tests/e2e</code> / <code>tests/integration</code></strong> (both empty — execution ran via in-package Flutter suites); Personas &amp; Glossary libraries are unfilled templates; no spec uses Related-rules / BR-conflict sections (0 rules · 0 conflicts everywhere). Of 330 ACs, 309 are verified; the remaining 21 are on-device / real-OS / real-screen-reader / Windows-runtime legs carried to manual checklists across 8 slugs (activity-detection, journey-view, map-experience, route-planner-v2, journey-pov, journey-dynamic-curve, journey-reset, vietnam-map-fidelity) — no automated failures anywhere. Two refine-wave slugs (the <code>map-bundle-weight</code> quick-change and <code>route-real-road</code>) use their spec ACs as the test contract rather than a separate designed-cases file.</p>
 
   <!-- AgenticFX pipeline -->
   <div class="dk-block-title" style="margin:30px 0 10px;">AgenticFX pipeline</div>
@@ -413,7 +453,7 @@
     <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Spec</span></div>
     <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Implement</span></div>
     <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Unit Tests</span></div>
-    <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Test Cases</span></div>
+    <div class="pstep partial" data-tip="18 of 20 slugs have a designed tests/cases file. The map-bundle-weight quick-change and route-real-road use their spec acceptance criteria as the test contract instead of a separate cases file."><span class="pdot">~</span><span class="plabel">Test Cases</span></div>
     <div class="pstep skipped" data-tip="tests/e2e and tests/integration hold only .gitkeep — no authored scripts. Executable tests live inside the Flutter package (src/focus_journey/test + integration_test), outside the scanned script folders."><span class="pdot">✗</span><span class="plabel">Test Scripts</span></div>
     <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Test Execution</span></div>
     <div class="pstep done"><span class="pdot">✓</span><span class="plabel">Ship</span></div>
@@ -421,7 +461,7 @@
 
   <!-- What it does -->
   <div class="dk-block-title" style="margin:30px 0 12px;">What it does</div>
-  <p class="section-sub">Fifteen slugs across three waves build one product: real focus time drives a virtual road trip up Vietnam. The engine is the honest core; everything else is a faithful view of it.</p>
+  <p class="section-sub">Twenty slugs across four waves build one product: real focus time drives a virtual road trip up Vietnam. The engine is the honest core; everything else — scene, cockpit, map, stats, and the latest UI/UX-refinement wave — is a faithful view of it.</p>
   <div class="features-grid">
     <div class="feature-item">
       <div class="fi-icon">🧭</div>
@@ -478,24 +518,34 @@
       <div class="fi-title">Dynamic sweeping curve</div>
       <div class="fi-desc"><code>journey-dynamic-curve</code> — intensifies the road into F1-style bends that sweep with the scroll phase (no wall-clock), preserving even arc-length object spacing.</div>
     </div>
+    <div class="feature-item">
+      <div class="fi-icon">🇻🇳</div>
+      <div class="fi-title">Accurate Vietnam (2026)</div>
+      <div class="fi-desc"><code>vietnam-map-fidelity</code> + <code>province-chain-2026</code> — a bundled, always-offline base map of Vietnam plus the journey rebuilt onto the current <strong>34 provinces</strong> (2025 reform), so the map and the route agree about what Vietnam is.</div>
+    </div>
+    <div class="feature-item">
+      <div class="fi-icon">🧭</div>
+      <div class="fi-title">Real-road route &amp; clean reset</div>
+      <div class="fi-desc"><code>route-real-road</code> + <code>journey-reset</code> — the line follows a real bundled national highway (OSM/ODbL, offline) with big pins only on start/end/stops, and an explicit Start-over / Reset-everything flow that never silently loses lifetime progress.</div>
+    </div>
   </div>
 
   <!-- Agentic build cost -->
   <div class="dk-block-title" style="margin:34px 0 10px;">Agentic build cost</div>
   <p class="section-sub" style="margin-bottom:14px;">Repo-wide Claude Code usage across every session that built this product — <strong>not</strong> per feature. Token counts are exact (from transcripts); the dollar figure is a <em>list-price estimate</em>, not a billed amount.</p>
   <div class="rollup">
-    <div class="r-item"><div class="r-num">334.6M</div><div class="r-label">Total tokens</div></div>
-    <div class="r-item"><div class="r-num">~$774</div><div class="r-label">Est. cost (list-price estimate)</div></div>
-    <div class="r-item"><div class="r-num">18</div><div class="r-label">Sessions</div></div>
-    <div class="r-item"><div class="r-num">419K / 1.98M</div><div class="r-label">Input / Output tokens</div></div>
+    <div class="r-item"><div class="r-num">477.7M</div><div class="r-label">Total tokens</div></div>
+    <div class="r-item"><div class="r-num">~$1,081</div><div class="r-label">Est. cost (list-price estimate)</div></div>
+    <div class="r-item"><div class="r-num">19</div><div class="r-label">Sessions</div></div>
+    <div class="r-item"><div class="r-num">423K / 2.71M</div><div class="r-label">Input / Output tokens</div></div>
     <div class="r-item"><div class="r-num">1</div><div class="r-label">Model · claude-opus-4-8</div></div>
   </div>
 </section>
 
 <!-- SLUGS -->
 <section id="slugs">
-  <h2>Slugs <span>— 15 in this epic</span></h2>
-  <p class="section-sub">In build order: the <code>journey-engine</code> core, the rest of the v1 MVP, the v2 feature wave, then the visual-polish epic. Every slug is shipped and green.</p>
+  <h2>Slugs <span>— 20 in this epic</span></h2>
+  <p class="section-sub">In build order: the <code>journey-engine</code> core, the rest of the v1 MVP, the v2 feature wave, the visual-polish epic, then the <code>refine-app-ui-ux</code> wave (Vietnam-2026 map + real-road route + reset). Every slug is shipped and green.</p>
   <div class="slug-cards">
 
     <div class="slug-card">
@@ -849,6 +899,123 @@
       </div>
     </div>
 
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Journey Reset — Start over &amp; Reset everything</div><div class="sc-slug">journey-reset · refine-app-ui-ux wave 1 (opening slice)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-07-15</span>
+        </div>
+        <p class="sc-desc">Gives the user two explicit, in-control fresh-start paths: a launch-time <strong>Resume / Start over</strong> prompt (author a new route while lifetime distance, stats, streaks &amp; badges are preserved), and a Settings <strong>Reset everything</strong> that, after confirmation, wipes all local data back to true first-run — a concrete, visible expression of the local-only privacy promise. macOS-verified; instant-feel + real screen-reader + Windows runtime carried to manual.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">13/15</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">25</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 1235/1235</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">15 ACs</span>
+          <span class="pill pass">✓ 13 verified</span>
+          <span class="pill pending">— 2 pending (instant-feel / screen-reader)</span>
+        </div>
+        <div class="tags">
+          <span class="tag">Resume / Start over prompt</span><span class="tag">Reset everything (full wipe)</span><span class="tag">stats preserved on start-over</span><span class="tag">true first-run state</span><span class="tag">launch gate</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Vietnam Map Fidelity — always-offline base map</div><div class="sc-slug">vietnam-map-fidelity · refine-app-ui-ux (Vietnam-2026 pair)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-07-15</span>
+        </div>
+        <p class="sc-desc">Replaces the blank grey canvas with an accurate, bundled static base map of Vietnam's current 34 provinces that always renders — even offline — with the journey drawn on top. Zero network, no tiles; the map is visible proof the app needs no network or location to draw the country. AC-5 straight-segment sea-crossings carried to <code>province-chain-2026</code>.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">12/14</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">24</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 1297/1297</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">14 ACs</span>
+          <span class="pill pass">✓ 12 verified</span>
+          <span class="pill pending">— 2 pending (fps / screen-reader)</span>
+        </div>
+        <div class="tags">
+          <span class="tag">bundled offline base map</span><span class="tag">34 provinces (2026)</span><span class="tag">zero network / no tiles</span><span class="tag">full-screen + minimap</span><span class="tag">CC BY-SA attribution</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Map Bundle Weight — trim dead assets</div><div class="sc-slug">map-bundle-weight · refine-app-ui-ux (quick-change)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-07-15</span>
+        </div>
+        <p class="sc-desc">A lean quick-change: the built app bundled the whole 2.9&nbsp;MB <code>assets/map/</code> directory while only loading the 200&nbsp;KB runtime GeoJSON. This drops the four dead source SVGs (2.7&nbsp;MB) from the shipped app while keeping them + their conversion tool in the repo. Spec ACs served as the test checklist.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">3/3</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">—</div><div class="l">Cases (ACs = checklist)</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 446/446</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">3 ACs</span>
+          <span class="pill pass">✓ 3 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">quick-change lane</span><span class="tag">−2.7 MB dead SVGs</span><span class="tag">runtime GeoJSON only</span><span class="tag">sources kept in repo</span><span class="tag">build-verified</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Province Chain 2026 — 34-unit data model</div><div class="sc-slug">province-chain-2026 · refine-app-ui-ux (Vietnam-2026 pair)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-07-16</span>
+        </div>
+        <p class="sc-desc">Rebuilds the journey's province/route <strong>data model</strong> onto Vietnam's current 34 units (2025 reform) so the map and the journey agree: one coherent south→north spine (Mũi Cà Mau → the northern border), real 2026 distances, migration-by-reset for retired province ids, and the route kept on land (owns the sea-crossing limitation carried from map-fidelity AC-5). Governed by ADR-0009.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">14/14</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">30</div><div class="l">Test cases</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 285/285</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">14 ACs</span>
+          <span class="pill pass">✓ 14 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">34-unit spine (ADR-0009)</span><span class="tag">6 municipalities + 28 provinces</span><span class="tag">great-circle distances</span><span class="tag">migration-by-reset</span><span class="tag">on-land coastal sweep</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="slug-card">
+      <div class="top-bar shipped"></div>
+      <div class="sc-body">
+        <div class="sc-head">
+          <div><div class="sc-title">Route Real-Road — follow the real highway</div><div class="sc-slug">route-real-road · refine-app-ui-ux wave (slice 3, closes wave)</div></div>
+          <span class="status-badge shipped">✓ Shipped · 2026-07-16</span>
+        </div>
+        <p class="sc-desc">Draws the route along Vietnam's <strong>real bundled national highway</strong> (QL1A + QL4A, sourced from OpenStreetMap under ODbL, fully offline) — a curved on-land road with big pins ONLY on start/end/stops, detouring out to off-highway stops so the line genuinely passes through every stop, with distance measured along the road. The journey stays paused until a route is confirmed and freezes on arrival — no manual button. Spec ACs are the test contract.</p>
+        <div class="sc-stats">
+          <div class="sc-stat"><div class="n">13/13</div><div class="l">ACs verified</div></div>
+          <div class="sc-stat"><div class="n">—</div><div class="l">Cases (ACs = contract)</div></div>
+          <div class="sc-stat"><div class="n">🟢</div><div class="l">Verdict · 1499/1499</div></div>
+        </div>
+        <div class="ac-totals">
+          <span class="pill total">13 ACs</span>
+          <span class="pill pass">✓ 13 verified</span>
+        </div>
+        <div class="tags">
+          <span class="tag">real bundled highway (OSM/ODbL)</span><span class="tag">curved, on-land, offline</span><span class="tag">pins only on start/end/stops</span><span class="tag">detour to off-highway stops</span><span class="tag">auto gate (no button)</span>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -902,7 +1069,7 @@
   <!-- Business rules & conflicts -->
   <div class="dk-block">
     <div class="dk-block-title">Business rules &amp; conflicts</div>
-    <div class="empty-note" style="margin-bottom:14px;">No slug in this epic declares a <code>## Related rules</code> or <code>## BR Conflicts</code> section — <strong>0 rules · 0 conflicts across all 15 slugs</strong>. This project's specs instead capture design constraints in <code>## Constraints &amp; assumptions</code> / <code>## Resolved decisions</code> / <code>## Open questions</code> and in ADRs (e.g. ADR-0003 single-window two-mode, ADR-0004 single distance axis, ADR-0007 cosmetic-override firewall). Per-slug groups below are shown for completeness.</div>
+    <div class="empty-note" style="margin-bottom:14px;">No slug in this epic declares a <code>## Related rules</code> or <code>## BR Conflicts</code> section — <strong>0 rules · 0 conflicts across all 20 slugs</strong>. This project's specs instead capture design constraints in <code>## Constraints &amp; assumptions</code> / <code>## Resolved decisions</code> / <code>## Open questions</code> and in ADRs (e.g. ADR-0003 single-window two-mode, ADR-0004 single distance axis, ADR-0007 cosmetic-override firewall, ADR-0008 bundled-offline-geodata, ADR-0009 34-unit spine). Per-slug groups below are shown for completeness.</div>
 
     <div class="rules-group"><div class="rg-head">Journey Engine<span class="rg-slug">journey-engine</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
     <div class="rules-group"><div class="rg-head">Activity Detection<span class="rg-slug">activity-detection</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
@@ -919,6 +1086,11 @@
     <div class="rules-group"><div class="rg-head">Journey Dynamic Curve<span class="rg-slug">journey-dynamic-curve</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
     <div class="rules-group"><div class="rg-head">Journey Cockpit Lean<span class="rg-slug">journey-cockpit-lean</span></div><div class="empty-note">No related business rules or conflicts recorded.</div></div>
     <div class="rules-group"><div class="rg-head">Vehicle Picker<span class="rg-slug">vehicle-picker</span></div><div class="empty-note">No related business rules or conflicts recorded (governed by ADR-0007).</div></div>
+    <div class="rules-group"><div class="rg-head">Journey Reset<span class="rg-slug">journey-reset</span></div><div class="empty-note">No related business rules or conflicts recorded (expresses the local-only privacy promise: full wipe returns to true first-run).</div></div>
+    <div class="rules-group"><div class="rg-head">Vietnam Map Fidelity<span class="rg-slug">vietnam-map-fidelity</span></div><div class="empty-note">No related business rules or conflicts recorded (governed by ADR-0008 bundled-offline-geodata; zero network / no location).</div></div>
+    <div class="rules-group"><div class="rg-head">Map Bundle Weight<span class="rg-slug">map-bundle-weight</span></div><div class="empty-note">No related business rules or conflicts recorded (quick-change asset trim).</div></div>
+    <div class="rules-group"><div class="rg-head">Province Chain 2026<span class="rg-slug">province-chain-2026</span></div><div class="empty-note">No related business rules or conflicts recorded (governed by ADR-0009 34-unit spine).</div></div>
+    <div class="rules-group"><div class="rg-head">Route Real-Road<span class="rg-slug">route-real-road</span></div><div class="empty-note">No related business rules or conflicts recorded (extends ADR-0008 bundled geodata with the OSM/ODbL highway; supersedes route-planner-v2 AC-5 remove-intermediate — flagged for a system-architect ADR amendment).</div></div>
   </div>
 </section>
 
@@ -930,11 +1102,11 @@
   <!-- (A) Test health at a glance -->
   <div class="dk-block-title" style="margin-bottom:12px;">Test health at a glance</div>
   <div class="rollup">
-    <div class="r-item"><div class="r-num">15 🟢</div><div class="r-label">Verdicts · all green</div></div>
+    <div class="r-item"><div class="r-num">20 🟢</div><div class="r-label">Verdicts · all green</div></div>
     <div class="r-item"><div class="r-num">100%</div><div class="r-label">Case pass-rate · every run</div></div>
-    <div class="r-item"><div class="r-num">350</div><div class="r-label">Cases designed</div></div>
-    <div class="r-item"><div class="r-num">0 / 15</div><div class="r-label">Scripts in tests/e2e|integration</div></div>
-    <div class="r-item"><div class="r-num">15 / 15</div><div class="r-label">Slugs executed</div></div>
+    <div class="r-item"><div class="r-num">429</div><div class="r-label">Cases designed</div></div>
+    <div class="r-item"><div class="r-num">0 / 20</div><div class="r-label">Scripts in tests/e2e|integration</div></div>
+    <div class="r-item"><div class="r-num">20 / 20</div><div class="r-label">Slugs executed</div></div>
   </div>
 
   <div class="audit-table-wrap">
@@ -956,10 +1128,15 @@
         <tr><td class="slug-cell">journey-dynamic-curve</td><td>15 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 182/182</td><td class="date">2026-06-25</td></tr>
         <tr><td class="slug-cell">journey-cockpit-lean</td><td>18 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 69/69 <span class="date">(+247 regression)</span></td><td class="date">2026-06-26</td></tr>
         <tr><td class="slug-cell">vehicle-picker</td><td>19 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 1161/1161 <span class="date">(full suite)</span></td><td class="date">2026-06-26</td></tr>
+        <tr><td class="slug-cell">journey-reset</td><td>25 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 1235/1235 <span class="date">(1221 unit/widget + 14 e2e)</span></td><td class="date">2026-07-15</td></tr>
+        <tr><td class="slug-cell">vietnam-map-fidelity</td><td>24 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 1297/1297 <span class="date">(1286 + 11 e2e · 1 skipped)</span></td><td class="date">2026-07-15</td></tr>
+        <tr><td class="slug-cell">map-bundle-weight</td><td class="gap">✗ none (quick-change · ACs = checklist)</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 446/446 <span class="date">(in-scope + build)</span></td><td class="date">2026-07-15</td></tr>
+        <tr><td class="slug-cell">province-chain-2026</td><td>30 designed</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 285/285 <span class="date">(267 unit/widget + 18 e2e)</span></td><td class="date">2026-07-16</td></tr>
+        <tr><td class="slug-cell">route-real-road</td><td class="gap">✗ none (contract = spec ACs)</td><td class="gap">✗ none (in-package Flutter)</td><td><span class="verdict green" style="padding:3px 10px; font-size:11px;">🟢 green</span></td><td><span class="pct">100%</span> · 1499/1499 <span class="date">(1481 unit/widget + 18 e2e)</span></td><td class="date">2026-07-16</td></tr>
       </tbody>
     </table>
   </div>
-  <p style="font-size:12px; color:var(--text-weak); margin-top:10px;">All 15 slugs executed and green (0 failures across every run). <strong>No slug has an authored script under <code>tests/e2e</code> or <code>tests/integration</code></strong> — those folders hold only <code>.gitkeep</code>; all executable tests live inside the Flutter package (<code>src/focus_journey/test</code> + <code>integration_test</code>), which is why the "Test scripts" column reads ✗ everywhere despite thousands of passing tests. Per-slug "pass rate" mixes in-scope and full-suite totals as each report presents them; totals grow over time as the regression suite accumulates.</p>
+  <p style="font-size:12px; color:var(--text-weak); margin-top:10px;">All 20 slugs executed and green (0 failures across every run; one documented skip in vietnam-map-fidelity). <strong>No slug has an authored script under <code>tests/e2e</code> or <code>tests/integration</code></strong> — those folders hold only <code>.gitkeep</code>; all executable tests live inside the Flutter package (<code>src/focus_journey/test</code> + <code>integration_test</code>), which is why the "Test scripts" column reads ✗ everywhere despite thousands of passing tests. Two refine-wave slugs (the <code>map-bundle-weight</code> quick-change and <code>route-real-road</code>) have no designed-cases file — their spec ACs are the test contract. Per-slug "pass rate" mixes in-scope and full-suite totals as each report presents them; totals grow over time as the regression suite accumulates.</p>
 
   <!-- (B) Per-slug detail -->
   <h3 style="margin:32px 0 14px;">Per-slug detail</h3>
@@ -1215,12 +1392,96 @@
     </table>
   </div>
 
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>journey-reset</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-07-15 · macOS (per-file integration)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">1235/1235 (1221 unit/widget regression + 14 macOS e2e), 0 failed/skipped. Instant-feel (NFR-1) + real screen-reader (NFR-3) + Windows runtime carried to the manual checklist.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>Full unit/widget suite (<code>test/</code>)</td><td>reset regression across features</td><td class="pass">PASS</td><td>1221</td></tr>
+        <tr><td>journey_reset_factory_reset_test.dart</td><td>full wipe → first-run (macOS)</td><td class="pass">PASS</td><td>4</td></tr>
+        <tr><td>journey_reset_launch_gate_test.dart</td><td>Resume / Start over prompt (macOS)</td><td class="pass">PASS</td><td>6</td></tr>
+        <tr><td>journey_reset_start_over_test.dart</td><td>start-over preserves stats (macOS)</td><td class="pass">PASS</td><td>4</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>vietnam-map-fidelity</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-07-15 · macOS (per-file integration)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">1297/1297 (1286 unit/widget + 11 macOS e2e; 1 documented skip). On-device fps (NFR-1) + real screen-reader (NFR-3) + Windows runtime carried to manual; AC-5 sea-crossings handed to province-chain-2026.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>Full unit/widget suite (<code>test/</code>)</td><td>base map + regression</td><td class="pass">PASS</td><td>1286</td></tr>
+        <tr><td>vietnam_map_fidelity_wiring_test.dart</td><td>offline base, no tiles/network (macOS)</td><td class="pass">PASS</td><td>6</td></tr>
+        <tr><td>map_experience_wiring_test.dart</td><td>overlay ⇄ full-screen (macOS)</td><td class="pass">PASS</td><td>4</td></tr>
+        <tr><td>route_wiring_smoke_test.dart</td><td>route smoke (macOS)</td><td class="pass">PASS</td><td>1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>map-bundle-weight</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Quick-change report · 2026-07-15 · macOS build + in-scope suite</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">446/446 in-scope passed and <code>flutter build macos --debug</code> succeeded. Verified by inspecting the built <code>.app</code>: <code>flutter_assets/assets/map/</code> ships only the runtime GeoJSON; the 4 source SVGs are excluded but kept in the repo. Quick-change — spec ACs are the checklist.</p>
+    <table class="result-table">
+      <thead><tr><th>Check</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>In-scope suite (route + onboarding)</td><td>base-map real-bundle guard</td><td class="pass">PASS</td><td>446</td></tr>
+        <tr><td>Built .app inspection (AC-1)</td><td>only vietnam_provinces_2025.geojson bundled</td><td class="pass">PASS</td><td>—</td></tr>
+        <tr><td>Repo check (AC-2)</td><td>4 SVGs + svg_to_geojson.py retained</td><td class="pass">PASS</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>province-chain-2026</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-07-16 · macOS (per-file integration)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">285/285 (267 in-scope unit/widget across 16 files + 18 macOS e2e), 0 failed/skipped. All 14 ACs verified; on-land coastal sweep holds to the documented ≤3-sample residual.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>In-scope unit/widget (16 files)</td><td>34-checkpoint chain, ordering, distances, migration (AC-1..)</td><td class="pass">PASS</td><td>267</td></tr>
+        <tr><td>route_wiring_smoke_test.dart</td><td>route smoke (macOS)</td><td class="pass">PASS</td><td>1</td></tr>
+        <tr><td>map_experience_wiring_test.dart</td><td>map overlay (macOS)</td><td class="pass">PASS</td><td>4</td></tr>
+        <tr><td>vietnam_map_fidelity + route_planner_v2 flow</td><td>cross-feature e2e (macOS)</td><td class="pass">PASS</td><td>13</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="report-card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <div><h3>route-real-road</h3><div style="font-size:12.5px; color:var(--text-weak); margin-top:2px;">Runner summary · 2026-07-16 · macOS (per-file integration; 2 stale assertions reconciled)</div></div>
+      <div class="verdict green">🟢 GREEN</div>
+    </div>
+    <p style="color:var(--text-medium); font-size:14px; margin-top:8px;">1499/1499 (1481 unit/widget + 18 e2e), 0 failed. Initial run flagged 2 stale <code>findsNothing('OpenStreetMap')</code> assertions from vietnam-map-fidelity that route-real-road's now-required ODbL road credit (NFR-4) correctly contradicts; reconciled to <code>findsOneWidget</code>, privacy guards untouched, re-ran 6/6. All AC-1..9 + NFR-1..4 exercised.</p>
+    <table class="result-table">
+      <thead><tr><th>Suite</th><th>Area (ACs)</th><th>Status</th><th>Count</th></tr></thead>
+      <tbody>
+        <tr><td>Full unit/widget suite (<code>test/</code>)</td><td>road path/route, detour, markers, gate (AC-1..9)</td><td class="pass">PASS</td><td>1481</td></tr>
+        <tr><td>route_planner_v2_flow_test.dart</td><td>authoring + review anchors-only (macOS)</td><td class="pass">PASS</td><td>7</td></tr>
+        <tr><td>map_experience_wiring_test.dart</td><td>road follows real geometry (macOS)</td><td class="pass">PASS</td><td>4</td></tr>
+        <tr><td>vietnam_map_fidelity + route_wiring_smoke</td><td>ODbL credit + no network (macOS)</td><td class="pass">PASS</td><td>7</td></tr>
+      </tbody>
+    </table>
+  </div>
+
 </section>
 
 <!-- FOOTER -->
 <footer>
   <p class="l1">Built with the <strong>JobLogic Agentic FX Framework</strong></p>
-  <p style="margin-top:12px; font-size:12px;">Vietnam Focus Journey · 15 slugs · v1 MVP → v2 → visual-polish epic · Flutter desktop (macOS + Windows)</p>
+  <p style="margin-top:12px; font-size:12px;">Vietnam Focus Journey · 20 slugs · v1 MVP → v2 → visual-polish → refine-app-ui-ux · Flutter desktop (macOS + Windows)</p>
 </footer>
 
 <script>
